@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**",".agents/**",".claude/**","vite.config.ts","vitest.config.ts","package.json","playwright.config.ts","rustfmt.toml","lefthook.yml",".oxlintrc.json",".oxfmtrc.json","src-tauri/**","tsconfig.json"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {},
+  "env": {
+    "builtin": true
+  }
+}
