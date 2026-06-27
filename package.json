@@ -1,0 +1,27 @@
+{
+  "name": "embed-preview",
+  "module": "index.ts",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "vitest": "^4.1.9"
+  },
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "sharp": "^0.35.2",
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "check": "fmt:check && lint:check",
+    "fmt:check": "oxfmt --check",
+    "fmt:fix": "oxfmt",
+    "lint:check": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run",
+    "dev": "bun --watch src/index.ts"
+  }
+}
