@@ -1,5 +1,7 @@
 # embed-preview
 
+![CI](https://github.com/tukuyomil032/discord-embed-preview/actions/workflows/ci.yml/badge.svg)
+
 A Discord bot that generates rich embed previews when a Discord message link is shared. Mention the bot with a link, and it replies with the message content, author info, images, and action buttons — no context switching needed.
 
 ## Features
