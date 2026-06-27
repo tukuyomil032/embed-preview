@@ -1,5 +1,5 @@
 import { AttachmentBuilder, type Attachment } from "discord.js";
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 
 const TILE = 320;
 const GRID_SIZE = TILE * 2; // 640x640
@@ -38,7 +38,7 @@ export async function composeGridImage(attachments: Attachment[]): Promise<Attac
     { left: TILE, top: TILE },
   ] as const;
 
-  const composites: sharp.OverlayOptions[] = imageBuffers.map((img, i) => {
+  const composites: OverlayOptions[] = imageBuffers.map((img, i) => {
     const pos = positions[i] ?? { left: 0, top: 0 };
     return {
       input: img.buffer,

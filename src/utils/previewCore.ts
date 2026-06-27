@@ -20,7 +20,7 @@ type PreviewPayload = {
 
 export async function buildPreviewPayload(
   message: Message,
-  channel: TextBasedChannel & { name?: string },
+  channel: TextBasedChannel & { name?: string | null },
   guildId: string,
   channelId: string,
   messageId: string,

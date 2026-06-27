@@ -2,7 +2,7 @@ import { EmbedBuilder, type Guild, type Message, type TextBasedChannel } from "d
 
 export function createPreviewEmbed(
   message: Message,
-  channel: TextBasedChannel & { name?: string },
+  channel: TextBasedChannel & { name?: string | null },
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setDescription(message.content || "*[No content]*")

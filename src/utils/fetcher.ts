@@ -47,7 +47,7 @@ export async function fetchTargetMessage(
 
   if (!message) {
     try {
-      const active = await guild.fetchActiveThreads();
+      const active = await guild.channels.fetchActiveThreads();
       for (const thread of active.threads.values()) {
         try {
           message = await thread.messages.fetch(messageId);
@@ -62,7 +62,7 @@ export async function fetchTargetMessage(
     }
   }
 
-  if (!message) {
+  if (!message || !channel) {
     console.debug(`[fetcher] Message ${messageId} not found in guild ${guildId}`);
     return null;
   }
