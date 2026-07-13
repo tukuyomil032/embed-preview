@@ -2,6 +2,7 @@ import { type ChatInputCommandInteraction, Client, Events, GatewayIntentBits } f
 import { config } from "dotenv";
 import { registerMessageCreateEvent } from "./events/messageCreate.ts";
 import { handlePreviewCommand, registerSlashCommands } from "./commands/preview.ts";
+import { handleSettingCommand, handleSettingsRemoveInteraction } from "./commands/settings.ts";
 import { isOpenOriginalButton, resolveOriginalUrlFromButtonInteraction } from "./utils/buttons.ts";
 import { resolveDiscordToken } from "./utils/env.ts";
 
@@ -33,6 +34,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isChatInputCommand() && interaction.commandName === "preview") {
       await handlePreviewCommand(interaction as ChatInputCommandInteraction, client);
+      return;
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === "settings") {
+      await handleSettingCommand(interaction as ChatInputCommandInteraction, client);
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === "settings_remove") {
+      await handleSettingsRemoveInteraction(interaction, client);
       return;
     }
 

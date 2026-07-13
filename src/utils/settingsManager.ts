@@ -102,17 +102,19 @@ export class SettingsManager {
    * Saves the current cache to the file in a queued, non-overlapping manner.
    */
   async save(): Promise<void> {
-    this.writeQueue = this.writeQueue.then(async () => {
-      try {
-        const dir = path.dirname(this.filepath);
-        await fs.promises.mkdir(dir, { recursive: true });
-        const data = JSON.stringify(this.cache, null, 2);
-        await fs.promises.writeFile(this.filepath, data, "utf-8");
-      } catch (err) {
-        console.error(`[SettingsManager] Failed to save settings to ${this.filepath}:`, err);
-        throw err;
-      }
-    });
+    this.writeQueue = this.writeQueue
+      .catch(() => {})
+      .then(async () => {
+        try {
+          const dir = path.dirname(this.filepath);
+          await fs.promises.mkdir(dir, { recursive: true });
+          const data = JSON.stringify(this.cache, null, 2);
+          await fs.promises.writeFile(this.filepath, data, "utf-8");
+        } catch (err) {
+          console.error(`[SettingsManager] Failed to save settings to ${this.filepath}:`, err);
+          throw err;
+        }
+      });
     return this.writeQueue;
   }
 

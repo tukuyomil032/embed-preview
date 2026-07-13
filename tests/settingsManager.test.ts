@@ -17,7 +17,7 @@ describe("SettingsManager", () => {
       if (fs.existsSync(TEST_FILE)) {
         await fs.promises.unlink(TEST_FILE);
       }
-    } catch (err) {
+    } catch {
       // ignore
     }
   });
@@ -138,14 +138,6 @@ describe("SettingsManager", () => {
       it("should allow if user is whitelisted", () => {
         const allowed = manager.isAllowed("g1", "blocked_chan", "ok_user", ["blocked_role"]);
         expect(allowed).toBe(true);
-      });
-
-      it("should allow if role is whitelisted", () => {
-        const allowed = manager.isAllowed("g1", "blocked_chan", "blocked_user", [
-          "ok_role",
-          "blocked_role",
-        ]);
-        expect(true).toBe(true); // temporary check, will use isAllowed below
       });
 
       it("should allow if role is whitelisted - actual test", () => {

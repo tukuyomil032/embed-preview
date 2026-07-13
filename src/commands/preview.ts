@@ -8,6 +8,8 @@ import {
 import { extractMessageLinks } from "../utils/urlParser.ts";
 import { fetchTargetMessage } from "../utils/fetcher.ts";
 import { buildPreviewPayload } from "../utils/previewCore.ts";
+import { settingCommand } from "./settings.ts";
+import { settingsManager } from "../utils/settingsManager.ts";
 
 export const previewCommand = new SlashCommandBuilder()
   .setName("preview")
@@ -25,6 +27,38 @@ export async function handlePreviewCommand(
   } catch (err) {
     console.error("[preview] Failed to defer reply:", err);
     return;
+  }
+
+  if (interaction.guildId) {
+    try {
+      await settingsManager.load();
+    } catch (err) {
+      console.error("[preview] Failed to load settings:", err);
+    }
+    const memberRoles = interaction.member?.roles;
+    const roleIds = Array.isArray(memberRoles)
+      ? memberRoles
+      : memberRoles
+        ? [...(memberRoles as any).cache.keys()]
+        : [];
+    if (
+      !settingsManager.isAllowed(
+        interaction.guildId,
+        interaction.channelId,
+        interaction.user.id,
+        roleIds,
+      )
+    ) {
+      try {
+        await interaction.followUp({
+          content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+          ephemeral: true,
+        });
+      } catch (err) {
+        console.error("[preview] Failed to send permission error response:", err);
+      }
+      return;
+    }
   }
 
   const link = interaction.options.getString("link", true);
@@ -71,6 +105,6 @@ export async function registerSlashCommands(client: Client, token: string): Prom
   if (!clientId) return;
 
   await rest.put(Routes.applicationCommands(clientId), {
-    body: [previewCommand.toJSON()],
+    body: [previewCommand.toJSON(), settingCommand.toJSON()],
   });
 }
