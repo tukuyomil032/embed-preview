@@ -1,6 +1,10 @@
 import { ButtonStyle } from "discord.js";
 import { describe, expect, it } from "vitest";
-import { isOpenOriginalButton, makeMessageButtons } from "../src/utils/buttons.ts";
+import {
+  isOpenOriginalButton,
+  makeMessageButtons,
+  resolveOriginalUrlFromButtonInteraction,
+} from "../src/utils/buttons.ts";
 
 describe("makeMessageButtons", () => {
   it("開くボタンとリンクボタンの2つを含む", () => {
@@ -44,5 +48,39 @@ describe("isOpenOriginalButton", () => {
   it("ボタンでもcustomIdが違えばfalse", () => {
     const interaction = { isButton: () => true, customId: "something_else" };
     expect(isOpenOriginalButton(interaction as never)).toBe(false);
+  });
+});
+
+describe("resolveOriginalUrlFromButtonInteraction", () => {
+  it("components[0].components[1].urlがあればそのURLを返す", () => {
+    const interaction = {
+      message: { components: [{ components: [{}, { url: "https://example.com/x" }] }] },
+    };
+    expect(resolveOriginalUrlFromButtonInteraction(interaction as never)).toBe(
+      "https://example.com/x",
+    );
+  });
+
+  it("rowにcomponentsが無ければフォールバック文字列を返す", () => {
+    const interaction = { message: { components: [{ type: "not-a-row" }] } };
+    expect(resolveOriginalUrlFromButtonInteraction(interaction as never)).toBe(
+      "メッセージリンクが見つかりません",
+    );
+  });
+
+  it("components[0]自体が無ければフォールバック文字列を返す", () => {
+    const interaction = { message: { components: [] } };
+    expect(resolveOriginalUrlFromButtonInteraction(interaction as never)).toBe(
+      "メッセージリンクが見つかりません",
+    );
+  });
+
+  it("urlがnullならフォールバック文字列を返す", () => {
+    const interaction = {
+      message: { components: [{ components: [{}, { url: null }] }] },
+    };
+    expect(resolveOriginalUrlFromButtonInteraction(interaction as never)).toBe(
+      "メッセージリンクが見つかりません",
+    );
   });
 });

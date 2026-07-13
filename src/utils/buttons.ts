@@ -23,3 +23,11 @@ export function makeMessageButtons(originalUrl: string): ActionRowBuilder<Button
 export function isOpenOriginalButton(interaction: Interaction): interaction is ButtonInteraction {
   return interaction.isButton() && interaction.customId === "open_original_message";
 }
+
+export function resolveOriginalUrlFromButtonInteraction(interaction: ButtonInteraction): string {
+  const row = interaction.message.components[0];
+  const urlComponent = row && "components" in row ? row.components[1] : undefined;
+  return urlComponent && "url" in urlComponent && urlComponent.url != null
+    ? urlComponent.url
+    : "メッセージリンクが見つかりません";
+}
