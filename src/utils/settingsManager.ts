@@ -7,7 +7,10 @@ export interface ListConfig {
   roles: string[];
 }
 
+export type SettingsMode = "blacklist" | "whitelist";
+
 export interface GuildSettings {
+  mode: SettingsMode;
   blacklist: ListConfig;
   whitelist: ListConfig;
 }
@@ -18,6 +21,7 @@ export interface SettingsData {
 
 export function createDefaultGuildSettings(): GuildSettings {
   return {
+    mode: "blacklist",
     blacklist: {
       channels: [],
       users: [],
@@ -33,6 +37,7 @@ export function createDefaultGuildSettings(): GuildSettings {
 
 function cloneGuildSettings(settings: GuildSettings): GuildSettings {
   return {
+    mode: settings.mode === "whitelist" ? "whitelist" : "blacklist",
     blacklist: {
       channels: [...(settings.blacklist?.channels || [])],
       users: [...(settings.blacklist?.users || [])],
@@ -140,19 +145,17 @@ export class SettingsManager {
    */
   isAllowed(guildId: string, channelId: string, userId: string, roleIds: string[]): boolean {
     const settings = this.getSettings(guildId);
-    const { blacklist, whitelist } = settings;
+    const { mode, blacklist, whitelist } = settings;
 
-    const whitelistChannels = whitelist.channels || [];
-    const whitelistUsers = whitelist.users || [];
-    const whitelistRoles = whitelist.roles || [];
+    if (mode === "whitelist") {
+      const whitelistChannels = whitelist.channels || [];
+      const whitelistUsers = whitelist.users || [];
+      const whitelistRoles = whitelist.roles || [];
 
-    const hasWhitelist =
-      whitelistChannels.length > 0 || whitelistUsers.length > 0 || whitelistRoles.length > 0;
-
-    if (hasWhitelist) {
       const channelAllowed = whitelistChannels.includes(channelId);
       const userAllowed = whitelistUsers.includes(userId);
       const roleAllowed = roleIds.some((roleId) => whitelistRoles.includes(roleId));
+
       return channelAllowed || userAllowed || roleAllowed;
     } else {
       const blacklistChannels = blacklist.channels || [];
@@ -162,6 +165,7 @@ export class SettingsManager {
       const channelBlocked = blacklistChannels.includes(channelId);
       const userBlocked = blacklistUsers.includes(userId);
       const roleBlocked = roleIds.some((roleId) => blacklistRoles.includes(roleId));
+
       return !(channelBlocked || userBlocked || roleBlocked);
     }
   }

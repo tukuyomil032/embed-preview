@@ -164,7 +164,7 @@ describe("Preview Command Integration with Settings", () => {
       userId: "user_abc",
     });
 
-    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+    (fetchTargetMessage as any).mockResolvedValue(null);
 
     await handlePreviewCommand(interaction, {} as Client);
 
@@ -282,7 +282,7 @@ describe("Preview Command Integration with Settings", () => {
       userId: "user_abc",
     });
 
-    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+    (fetchTargetMessage as any).mockResolvedValue(null);
 
     await handlePreviewCommand(interaction, {} as Client);
 

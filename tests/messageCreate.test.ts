@@ -83,7 +83,7 @@ describe("registerMessageCreateEvent", () => {
     vi.mocked(previewMessageLink)
       .mockRejectedValueOnce(new Error("preview failed"))
       .mockResolvedValueOnce(undefined);
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => { });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { getHandler } = setup();
     const message = makeMessage({
       content: "<@999> https://discord.com/channels/1/2/3 https://discord.com/channels/4/5/6",
