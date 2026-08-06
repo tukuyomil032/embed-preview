@@ -83,7 +83,7 @@ The PR template asks for four sections — fill them in rather than deleting the
 
 - **Problem** — what's broken, missing, or awkward today, and why it matters. Describe the current behavior, not the fix.
 - **Solution** — what you changed and why you took this approach, as a short bullet list.
-- **Scope** — what's included, and just as importantly, what's explicitly *not* touched by this change.
+- **Scope** — what's included, and just as importantly, what's explicitly _not_ touched by this change.
 - **Validation** — the `just check` result plus any manual QA steps you performed against a real bot/server.
 
 This mirrors how a good bug report separates "what's wrong" from "how it's fixed," and makes it much faster for a reviewer to judge whether the change matches the stated problem.
