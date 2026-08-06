@@ -2,6 +2,10 @@
 
 DiscordメッセージURLを貼ると、対象メッセージのプレビュー埋め込みをリプライするBotのDiscord.js (TypeScript/Bun) 実装。
 
+## コントリビュート規約
+
+このプロジェクトへの変更（PR作成含む）を行う際は、[CONTRIBUTING.md](./CONTRIBUTING.md) を必ず読み、そこに書かれているブランチ命名・コミット規約・コーディング規約・PR説明フォーマット（Problem/Solution/Scope/Validation）に従うこと。
+
 ## 技術スタック
 
 - Runtime: Bun / TypeScript strict
