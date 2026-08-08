@@ -1,4 +1,4 @@
-import { type ChatInputCommandInteraction, Client, Events, GatewayIntentBits } from "discord.js";
+import { type ChatInputCommandInteraction, Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import { config } from "dotenv";
 import { registerMessageCreateEvent } from "./events/messageCreate.ts";
 import { handlePreviewCommand, registerSlashCommands } from "./commands/preview.ts";
@@ -53,7 +53,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (isOpenOriginalButton(interaction)) {
       const originalUrl = resolveOriginalUrlFromButtonInteraction(interaction);
-      await interaction.reply({ content: originalUrl, ephemeral: true });
+      await interaction.reply({ content: originalUrl, flags: [MessageFlags.Ephemeral] });
     }
   } catch (err) {
     console.error("[index] InteractionCreate handler error:", err);

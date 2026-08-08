@@ -8,6 +8,7 @@ import {
   previewCommand,
   registerSlashCommands,
 } from "../src/commands/preview.ts";
+import { settingCommand } from "../src/commands/settings.ts";
 import { fetchTargetMessage } from "../src/utils/fetcher.ts";
 import { buildPreviewPayload } from "../src/utils/previewCore.ts";
 import { settingsManager } from "../src/utils/settingsManager.ts";
@@ -62,14 +63,24 @@ describe("handlePreviewCommand", () => {
   it("メッセージ取得成功時はbuildPreviewPayloadの返り値をfollowUpに渡す", async () => {
     const interaction = createMockInteraction();
     const targetMsg = {} as never;
-    const payload = { content: "preview payload" } as never;
+    const payload = { embeds: [], files: [], components: [] } as never;
 
-    vi.mocked(fetchTargetMessage).mockResolvedValue(targetMsg);
+    vi.mocked(fetchTargetMessage).mockResolvedValue({
+      message: targetMsg,
+      channel: {} as never,
+      guild: {} as never,
+    });
     vi.mocked(buildPreviewPayload).mockResolvedValue(payload);
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(buildPreviewPayload).toHaveBeenCalledWith(targetMsg);
+    expect(buildPreviewPayload).toHaveBeenCalledWith(
+      targetMsg,
+      expect.anything(),
+      "1",
+      "2",
+      "3",
+    );
     expect(interaction.followUp).toHaveBeenCalledWith(payload);
   });
 });
@@ -101,7 +112,7 @@ describe("registerSlashCommands", () => {
 
     expect(restInstance.setToken).toHaveBeenCalledWith("token");
     expect(restInstance.put).toHaveBeenCalledWith(Routes.applicationCommands("app-1"), {
-      body: [previewCommand.toJSON()],
+      body: [previewCommand.toJSON(), settingCommand.toJSON()],
     });
   });
 });
@@ -164,7 +175,7 @@ describe("Preview Command Integration with Settings", () => {
       userId: "user_abc",
     });
 
-    (fetchTargetMessage as any).mockResolvedValue(null);
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
 
     await handlePreviewCommand(interaction, {} as Client);
 
@@ -282,7 +293,7 @@ describe("Preview Command Integration with Settings", () => {
       userId: "user_abc",
     });
 
-    (fetchTargetMessage as any).mockResolvedValue(null);
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
 
     await handlePreviewCommand(interaction, {} as Client);
 

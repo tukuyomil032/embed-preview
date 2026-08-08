@@ -23,6 +23,7 @@ import {
   ChannelSelectMenuBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  PermissionFlagsBits,
 } from "discord.js";
 import { settingsManager, type GuildSettings } from "../utils/settingsManager.ts";
 
@@ -56,7 +57,9 @@ const backButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
 
 export const settingCommand = new SlashCommandBuilder()
   .setName("settings")
-  .setDescription("Configure the bot settings");
+  .setDescription("Configure the bot settings")
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export function buildMainSettingsComponents(guild: any): any[] {
   const container = new ContainerBuilder().setAccentColor(0x4169e1);
@@ -177,7 +180,7 @@ function extractFieldValues(fields: any, targetCustomId: string): string[] {
       const v = fields.getTextInputValue(targetCustomId);
       if (typeof v === "string" && v.length > 0) return [v];
     }
-  } catch { }
+  } catch {}
 
   try {
     const rawFields = fields.fields || fields.components;
@@ -196,7 +199,7 @@ function extractFieldValues(fields: any, targetCustomId: string): string[] {
         }
       }
     }
-  } catch { }
+  } catch {}
 
   try {
     const directObj = fields[targetCustomId] || fields.getField?.(targetCustomId);
@@ -204,7 +207,7 @@ function extractFieldValues(fields: any, targetCustomId: string): string[] {
       if (Array.isArray(directObj.values)) return directObj.values;
       if (typeof directObj.value === "string") return [directObj.value];
     }
-  } catch { }
+  } catch {}
 
   return results;
 }
@@ -233,7 +236,7 @@ function isConfirmed(fields: any, confirmCustomId: string): boolean {
         }
       }
     }
-  } catch { }
+  } catch {}
 
   return false;
 }
@@ -825,7 +828,7 @@ export async function buildDeleteModal(
         if (member) {
           name = member.user?.username || member.displayName || id;
         }
-      } catch { }
+      } catch {}
     }
     const label = `@${name} (${id})`.slice(0, 100);
     userOptions.push(
@@ -843,7 +846,7 @@ export async function buildDeleteModal(
         if (role) {
           name = role.name || id;
         }
-      } catch { }
+      } catch {}
     }
     const label = `@${name} (${id})`.slice(0, 100);
     roleOptions.push(
@@ -861,7 +864,7 @@ export async function buildDeleteModal(
         if (channel) {
           name = channel.name || id;
         }
-      } catch { }
+      } catch {}
     }
     const label = `#${name} (${id})`.slice(0, 100);
     channelOptions.push(
@@ -957,7 +960,7 @@ export async function buildDeleteFallbackComponents(
           const member =
             guild.members?.cache?.get(id) || (await guild.members?.fetch(id).catch(() => null));
           if (member) name = member.user?.username || member.displayName || id;
-        } catch { }
+        } catch {}
       }
       userLines.push(`#${index++} ${name} (${id})`);
     }
@@ -973,7 +976,7 @@ export async function buildDeleteFallbackComponents(
           const role =
             guild.roles?.cache?.get(id) || (await guild.roles?.fetch(id).catch(() => null));
           if (role) name = role.name || id;
-        } catch { }
+        } catch {}
       }
       roleLines.push(`#${index++} ${name} (${id})`);
     }
@@ -989,7 +992,7 @@ export async function buildDeleteFallbackComponents(
           const ch =
             guild.channels?.cache?.get(id) || (await guild.channels?.fetch(id).catch(() => null));
           if (ch) name = ch.name || id;
-        } catch { }
+        } catch {}
       }
       channelLines.push(`#${index++} ${name} (${id})`);
     }
@@ -1099,7 +1102,7 @@ export async function buildDeleteConfirmComponents(
             (await guild.channels?.fetch(item.id).catch(() => null));
           if (ch) name = ch.name || item.id;
         }
-      } catch { }
+      } catch {}
     }
     const prefix = item.type === "channels" ? "#" : "@";
     lines.push(`• #${item.num} ${prefix}${name} (${item.id})`);

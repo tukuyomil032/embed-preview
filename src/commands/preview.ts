@@ -4,6 +4,7 @@ import {
   REST,
   Routes,
   SlashCommandBuilder,
+  MessageFlags
 } from "discord.js";
 import { extractMessageLinks } from "../utils/urlParser.ts";
 import { fetchTargetMessage } from "../utils/fetcher.ts";
@@ -66,7 +67,10 @@ export async function handlePreviewCommand(
 
   if (links.length === 0) {
     try {
-      await interaction.followUp({ content: "Invalid message link.", ephemeral: true });
+      await interaction.followUp({
+        content: "Invalid message link.",
+        flags: [MessageFlags.Ephemeral],
+      });
     } catch (err) {
       console.error("[preview] Failed to send invalid-link response:", err);
     }
@@ -78,7 +82,10 @@ export async function handlePreviewCommand(
 
   if (!result) {
     try {
-      await interaction.followUp({ content: "Message not found.", ephemeral: true });
+      await interaction.followUp({
+        content: "Message not found.",
+        flags: [MessageFlags.Ephemeral],
+      });
     } catch (err) {
       console.error("[preview] Failed to send not-found response:", err);
     }
