@@ -7,10 +7,10 @@ import {
 } from "../src/utils/buttons.ts";
 
 describe("makeMessageButtons", () => {
-  it("開くボタンとリンクボタンの2つを含む", () => {
+  it("開くボタン、リンクボタン、削除ボタンの3つを含む", () => {
     const row = makeMessageButtons("https://discord.com/channels/1/2/3");
     const data = row.toJSON();
-    expect(data.components).toHaveLength(2);
+    expect(data.components).toHaveLength(3);
   });
 
   it("1つ目は open_original_message ボタン", () => {
@@ -30,6 +30,15 @@ describe("makeMessageButtons", () => {
       label: "Direct link",
       style: ButtonStyle.Link,
       url: "https://discord.com/channels/1/2/3",
+    });
+  });
+
+  it("3つ目はdelete_preview削除ボタン", () => {
+    const row = makeMessageButtons("https://discord.com/channels/1/2/3");
+    const [, , delBtn] = row.toJSON().components;
+    expect(delBtn).toMatchObject({
+      custom_id: "delete_preview",
+      style: ButtonStyle.Danger,
     });
   });
 });

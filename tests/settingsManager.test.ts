@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as os from "node:os";
 import { SettingsManager, createDefaultGuildSettings } from "../src/utils/settingsManager.ts";
 
 const TEST_FILE = path.resolve("tests/temp-settings.json");
@@ -260,7 +261,7 @@ describe("SettingsManager デフォルトパスの解決", () => {
 
   it("SETTINGS_PATH 未設定時はプロジェクトルート基準で解決し、process.cwd() に依存しない", () => {
     delete process.env.SETTINGS_PATH;
-    process.chdir("/tmp");
+    process.chdir(os.tmpdir());
 
     const manager = new SettingsManager();
 

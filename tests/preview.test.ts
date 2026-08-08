@@ -247,9 +247,9 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.reply).toHaveBeenCalledWith(
+    expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
       }),
     );
@@ -271,9 +271,9 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.reply).toHaveBeenCalledWith(
+    expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
       }),
     );
@@ -298,9 +298,9 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.reply).toHaveBeenCalledWith(
+    expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
       }),
     );
@@ -345,9 +345,9 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.reply).toHaveBeenCalledWith(
+    expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
       }),
     );

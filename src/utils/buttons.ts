@@ -12,11 +12,20 @@ export function makeMessageButtons(originalUrl: string): ActionRowBuilder<Button
     .setStyle(ButtonStyle.Link)
     .setURL(originalUrl);
 
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(openBtn, linkBtn);
+  const delBtn = new ButtonBuilder()
+    .setCustomId("delete_preview")
+    .setEmoji("🗑️")
+    .setStyle(ButtonStyle.Danger);
+
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(openBtn, linkBtn, delBtn);
 }
 
 export function isOpenOriginalButton(interaction: Interaction): interaction is ButtonInteraction {
   return interaction.isButton() && interaction.customId === "open_original_message";
+}
+
+export function isDeletePreviewButton(interaction: Interaction): interaction is ButtonInteraction {
+  return interaction.isButton() && interaction.customId === "delete_preview";
 }
 
 export function resolveOriginalUrlFromButtonInteraction(interaction: ButtonInteraction): string {
