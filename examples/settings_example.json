@@ -1,0 +1,17 @@
+{
+  "guilds": {
+    "GUILD_ID": {
+      "mode": "blacklist | whitelist",
+      "blacklist": {
+        "channels": ["CHANNEL_ID"],
+        "users": ["USER_ID"],
+        "roles": ["ROLE_ID"]
+      },
+      "whitelist": {
+        "channels": ["CHANNEL_ID"],
+        "users": ["USER_ID"],
+        "roles": ["ROLE_ID"]
+      }
+    }
+  }
+}

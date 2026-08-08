@@ -35,3 +35,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Claude local settings
 .claude/settings.local.json
+
+# Gemini Working Directory
+.superpowers
+.superpowers/sdd
+docs/superpowers
+
+# settings file etc.
+data/
