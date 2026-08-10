@@ -74,13 +74,7 @@ describe("handlePreviewCommand", () => {
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(buildPreviewPayload).toHaveBeenCalledWith(
-      targetMsg,
-      expect.anything(),
-      "1",
-      "2",
-      "3",
-    );
+    expect(buildPreviewPayload).toHaveBeenCalledWith(targetMsg, expect.anything(), "1", "2", "3");
     expect(interaction.followUp).toHaveBeenCalledWith(payload);
   });
 });

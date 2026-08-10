@@ -1,4 +1,10 @@
-import { type ChatInputCommandInteraction, Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
+import {
+  type ChatInputCommandInteraction,
+  Client,
+  Events,
+  GatewayIntentBits,
+  MessageFlags,
+} from "discord.js";
 import { config } from "dotenv";
 import { registerMessageCreateEvent } from "./events/messageCreate.ts";
 import { handlePreviewCommand, registerSlashCommands } from "./commands/preview.ts";

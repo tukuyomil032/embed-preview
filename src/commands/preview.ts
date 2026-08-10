@@ -4,7 +4,7 @@ import {
   REST,
   Routes,
   SlashCommandBuilder,
-  MessageFlags
+  MessageFlags,
 } from "discord.js";
 import { extractMessageLinks } from "../utils/urlParser.ts";
 import { fetchTargetMessage } from "../utils/fetcher.ts";
