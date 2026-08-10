@@ -11,6 +11,7 @@ import { handlePreviewCommand, registerSlashCommands } from "./commands/preview.
 import { handleSettingCommand, handleSettingsInteraction } from "./commands/settings.ts";
 import { isOpenOriginalButton, resolveOriginalUrlFromButtonInteraction } from "./utils/buttons.ts";
 import { resolveDiscordToken } from "./utils/env.ts";
+import { settingsManager } from "./utils/settingsManager.ts";
 
 config();
 
@@ -28,6 +29,13 @@ registerMessageCreateEvent(client);
 
 client.on(Events.ClientReady, async (readyClient) => {
   console.log(`[index] Bot logged in as ${readyClient.user.tag}`);
+  try {
+    await settingsManager.load();
+    console.log("[index] Settings loaded");
+  } catch (err) {
+    console.error("[index] Failed to load settings:", err);
+  }
+
   try {
     await registerSlashCommands(readyClient, TOKEN);
     console.log("[index] Slash commands registered");

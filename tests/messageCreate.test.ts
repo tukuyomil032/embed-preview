@@ -120,6 +120,7 @@ describe("MessageCreate Event Integration with Settings", () => {
       }),
     } as unknown as Client;
 
+    await settingsManager.load();
     registerMessageCreateEvent(client);
   });
 

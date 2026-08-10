@@ -55,10 +55,18 @@ export class SettingsManager {
   private filepath: string;
   private cache: SettingsData;
   private writeQueue: Promise<void> = Promise.resolve();
+  private isLoaded: boolean = false;
 
   constructor(filepath: string = "data/settings.json") {
     this.filepath = filepath;
     this.cache = { guilds: {} };
+  }
+
+  /**
+   * Returns whether settings have been successfully loaded.
+   */
+  getIsLoaded(): boolean {
+    return this.isLoaded;
   }
 
   /**
@@ -73,6 +81,7 @@ export class SettingsManager {
         // File doesn't exist, initialize and write empty settings
         this.cache = { guilds: {} };
         await this.save();
+        this.isLoaded = true;
         return;
       }
 
@@ -80,6 +89,7 @@ export class SettingsManager {
       if (!content.trim()) {
         this.cache = { guilds: {} };
         await this.save();
+        this.isLoaded = true;
         return;
       }
 
@@ -94,12 +104,10 @@ export class SettingsManager {
       } else {
         this.cache = { guilds: {} };
       }
+      this.isLoaded = true;
     } catch (err) {
-      console.warn(
-        `[SettingsManager] Error loading settings from ${this.filepath}, falling back to empty config:`,
-        err,
-      );
-      this.cache = { guilds: {} };
+      console.error(`[SettingsManager] Error loading settings from ${this.filepath}:`, err);
+      this.isLoaded = false;
     }
   }
 
@@ -144,6 +152,10 @@ export class SettingsManager {
    * Determines if message previewing is allowed under the current guild context.
    */
   isAllowed(guildId: string, channelId: string, userId: string, roleIds: string[]): boolean {
+    if (!this.isLoaded) {
+      return false;
+    }
+
     const settings = this.getSettings(guildId);
     const { mode, blacklist, whitelist } = settings;
 

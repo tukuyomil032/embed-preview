@@ -5,6 +5,8 @@ import {
   Routes,
   SlashCommandBuilder,
   MessageFlags,
+  ContainerBuilder,
+  TextDisplayBuilder,
 } from "discord.js";
 import { extractMessageLinks } from "../utils/urlParser.ts";
 import { fetchTargetMessage } from "../utils/fetcher.ts";
@@ -31,11 +33,25 @@ export async function handlePreviewCommand(
   }
 
   if (interaction.guildId) {
-    try {
-      await settingsManager.load();
-    } catch (err) {
-      console.error("[preview] Failed to load settings:", err);
+    if (!settingsManager.getIsLoaded()) {
+      try {
+        const container = new ContainerBuilder()
+          .setAccentColor(0xed4245)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              "Preview feature is restricted. Unable to load settings file.",
+            ),
+          );
+        await interaction.followUp({
+          components: [container],
+          flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
+        });
+      } catch (err) {
+        console.error("[preview] Failed to send settings load error response:", err);
+      }
+      return;
     }
+
     const memberRoles = interaction.member?.roles;
     const roleIds = Array.isArray(memberRoles)
       ? memberRoles
@@ -53,7 +69,7 @@ export async function handlePreviewCommand(
       try {
         await interaction.followUp({
           content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
-          ephemeral: true,
+          flags: [MessageFlags.Ephemeral],
         });
       } catch (err) {
         console.error("[preview] Failed to send permission error response:", err);

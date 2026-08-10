@@ -64,6 +64,7 @@ describe("SettingsManager", () => {
 
     it("設定を更新し、キャッシュおよびファイルに保存する", async () => {
       await manager.load();
+      expect(manager.getIsLoaded()).toBe(true);
       const newSettings = createDefaultGuildSettings();
       newSettings.mode = "whitelist";
       newSettings.whitelist.channels.push("c_white");
@@ -80,6 +81,15 @@ describe("SettingsManager", () => {
       const parsed = JSON.parse(fileContent);
       expect(parsed.guilds["guild_abc"].mode).toBe("whitelist");
       expect(parsed.guilds["guild_abc"].whitelist.channels).toEqual(["c_white"]);
+    });
+
+    it("JSON破損など読み込み失敗時は getIsLoaded() が false となり isAllowed が false を返す (Fail-Closed)", async () => {
+      await fs.promises.mkdir(path.dirname(TEST_FILE), { recursive: true });
+      await fs.promises.writeFile(TEST_FILE, "invalid json content", "utf-8");
+
+      await manager.load();
+      expect(manager.getIsLoaded()).toBe(false);
+      expect(manager.isAllowed("g1", "c1", "u1", [])).toBe(false);
     });
   });
 

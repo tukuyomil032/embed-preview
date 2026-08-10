@@ -121,6 +121,7 @@ describe("Preview Command Integration with Settings", () => {
     if (fs.existsSync(TEST_FILE)) {
       await fs.promises.unlink(TEST_FILE);
     }
+    await settingsManager.load();
   });
 
   afterEach(async () => {
@@ -162,6 +163,23 @@ describe("Preview Command Integration with Settings", () => {
     } as unknown as ChatInputCommandInteraction;
   }
 
+  it("should return container error response when settings failed to load (isLoaded is false)", async () => {
+    (settingsManager as any).isLoaded = false;
+    const interaction = createMockInteraction({
+      guildId: "123",
+    });
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+    expect(interaction.followUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
+      }),
+    );
+  });
+
   it("should allow preview by default if there are no settings restrictions", async () => {
     const interaction = createMockInteraction({
       guildId: "123",
@@ -199,7 +217,7 @@ describe("Preview Command Integration with Settings", () => {
     expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       }),
     );
   });
@@ -223,7 +241,7 @@ describe("Preview Command Integration with Settings", () => {
     expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       }),
     );
   });
@@ -250,7 +268,7 @@ describe("Preview Command Integration with Settings", () => {
     expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       }),
     );
   });
@@ -275,7 +293,7 @@ describe("Preview Command Integration with Settings", () => {
     expect(interaction.followUp).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       }),
     );
   });
