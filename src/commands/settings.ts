@@ -27,14 +27,13 @@ import {
 } from "discord.js";
 import { settingsManager, type GuildSettings } from "../utils/settingsManager.ts";
 
-const toggleButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+const createToggleButton = (): ButtonBuilder =>
   new ButtonBuilder()
     .setCustomId("settings:toggle_mode")
     .setLabel("Switch mode")
-    .setStyle(ButtonStyle.Primary),
-);
+    .setStyle(ButtonStyle.Primary);
 
-const actionButtonsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+const createActionButtons = (): ButtonBuilder[] => [
   new ButtonBuilder()
     .setCustomId("settings:action_add")
     .setEmoji("✅")
@@ -45,15 +44,14 @@ const actionButtonsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     .setEmoji("🗑️")
     .setLabel("Delete")
     .setStyle(ButtonStyle.Danger),
-);
+];
 
-const backButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+const createBackButton = (): ButtonBuilder =>
   new ButtonBuilder()
     .setCustomId("settings:main")
     .setEmoji("⬅️")
     .setLabel("Back")
-    .setStyle(ButtonStyle.Secondary),
-);
+    .setStyle(ButtonStyle.Secondary);
 
 export const settingCommand = new SlashCommandBuilder()
   .setName("settings")
@@ -658,7 +656,7 @@ export function buildSettingsComponents(
   container.addSectionComponents(
     new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`Current Mode: ${modeText}`))
-      .setButtonAccessory(toggleButtonRow.components[0] as ButtonBuilder),
+      .setButtonAccessory(createToggleButton()),
   );
 
   container.addSeparatorComponents(
@@ -686,8 +684,8 @@ export function buildSettingsComponents(
   );
 
   const action_back_btn_row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    ...backButtonRow.components,
-    ...actionButtonsRow.components,
+    createBackButton(),
+    ...createActionButtons(),
   );
 
   container.addActionRowComponents(action_back_btn_row);
