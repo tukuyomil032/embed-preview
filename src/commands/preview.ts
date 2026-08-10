@@ -26,13 +26,6 @@ export async function handlePreviewCommand(
   interaction: ChatInputCommandInteraction,
   client: Client,
 ): Promise<void> {
-  try {
-    await interaction.deferReply();
-  } catch (err) {
-    console.error("[preview] Failed to defer reply:", err);
-    return;
-  }
-
   if (interaction.guildId) {
     if (!settingsManager.getIsLoaded()) {
       try {
@@ -43,7 +36,7 @@ export async function handlePreviewCommand(
               "Preview feature is restricted. Unable to load settings file.",
             ),
           );
-        await interaction.followUp({
+        await interaction.reply({
           components: [container],
           flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
         });
@@ -63,7 +56,7 @@ export async function handlePreviewCommand(
       )
     ) {
       try {
-        await interaction.followUp({
+        await interaction.reply({
           content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
           flags: [MessageFlags.Ephemeral],
         });
@@ -72,6 +65,13 @@ export async function handlePreviewCommand(
       }
       return;
     }
+  }
+
+  try {
+    await interaction.deferReply();
+  } catch (err) {
+    console.error("[preview] Failed to defer reply:", err);
+    return;
   }
 
   const link = interaction.options.getString("link", true);

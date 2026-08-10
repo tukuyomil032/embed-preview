@@ -142,6 +142,7 @@ describe("Preview Command Integration with Settings", () => {
     link?: string;
   }) {
     const deferReply = vi.fn().mockResolvedValue(undefined);
+    const reply = vi.fn().mockResolvedValue(undefined);
     const followUp = vi.fn().mockResolvedValue(undefined);
     const getString = vi.fn().mockImplementation((name: string) => {
       if (name === "link") return options.link ?? "https://discord.com/channels/123/456/789";
@@ -150,6 +151,7 @@ describe("Preview Command Integration with Settings", () => {
 
     return {
       deferReply,
+      reply,
       followUp,
       guildId: options.guildId !== undefined ? options.guildId : "123",
       channelId: options.channelId ?? "456",
@@ -171,9 +173,9 @@ describe("Preview Command Integration with Settings", () => {
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
       }),
@@ -212,9 +214,9 @@ describe("Preview Command Integration with Settings", () => {
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
         flags: [MessageFlags.Ephemeral],
@@ -236,9 +238,9 @@ describe("Preview Command Integration with Settings", () => {
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
         flags: [MessageFlags.Ephemeral],
@@ -263,9 +265,9 @@ describe("Preview Command Integration with Settings", () => {
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
         flags: [MessageFlags.Ephemeral],
@@ -310,9 +312,9 @@ describe("Preview Command Integration with Settings", () => {
 
     await handlePreviewCommand(interaction, {} as Client);
 
-    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
         flags: [MessageFlags.Ephemeral],
