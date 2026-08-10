@@ -24,7 +24,7 @@ fmt-fix:
 
 # TypeScript type check
 typecheck:
-    bun check
+    bun tsc --noEmit
 
 # Run tests (once)
 test:
