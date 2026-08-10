@@ -2,6 +2,7 @@ import { Events, type Client, type Message } from "discord.js";
 import { extractMessageLinks } from "../utils/urlParser.ts";
 import { previewMessageLink } from "../utils/previewCore.ts";
 import { settingsManager } from "../utils/settingsManager.ts";
+import { extractMemberRoleIds } from "../utils/memberUtils.ts";
 
 export function registerMessageCreateEvent(client: Client): void {
   client.on(Events.MessageCreate, async (message: Message) => {
@@ -18,7 +19,7 @@ export function registerMessageCreateEvent(client: Client): void {
     if (links.length === 0) return;
 
     if (message.guildId) {
-      const roleIds = message.member?.roles?.cache?.map((r) => r.id) || [];
+      const roleIds = extractMemberRoleIds(message.member, message.guildId);
       if (
         !settingsManager.isAllowed(message.guildId, message.channelId, message.author.id, roleIds)
       ) {

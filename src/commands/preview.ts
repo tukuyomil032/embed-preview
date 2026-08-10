@@ -13,6 +13,7 @@ import { fetchTargetMessage } from "../utils/fetcher.ts";
 import { buildPreviewPayload } from "../utils/previewCore.ts";
 import { settingCommand } from "./settings.ts";
 import { settingsManager } from "../utils/settingsManager.ts";
+import { extractMemberRoleIds } from "../utils/memberUtils.ts";
 
 export const previewCommand = new SlashCommandBuilder()
   .setName("preview")
@@ -52,12 +53,7 @@ export async function handlePreviewCommand(
       return;
     }
 
-    const memberRoles = interaction.member?.roles;
-    const roleIds = Array.isArray(memberRoles)
-      ? memberRoles
-      : memberRoles
-        ? [...(memberRoles as any).cache.keys()]
-        : [];
+    const roleIds = extractMemberRoleIds(interaction.member, interaction.guildId);
     if (
       !settingsManager.isAllowed(
         interaction.guildId,

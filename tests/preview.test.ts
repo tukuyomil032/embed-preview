@@ -273,6 +273,28 @@ describe("Preview Command Integration with Settings", () => {
     );
   });
 
+  it("should allow preview if @everyone (guildId) is whitelisted even when member.roles is an array", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.roles.push("123"); // @everyone role ID
+    await settingsManager.setSettings("123", settings);
+
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: ["other_role"], // does not contain '123' explicitly
+    });
+
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(fetchTargetMessage).toHaveBeenCalled();
+  });
+
   it("should restrict preview if role is blacklisted (array roles)", async () => {
     await settingsManager.load();
     const settings = settingsManager.getSettings("123");
