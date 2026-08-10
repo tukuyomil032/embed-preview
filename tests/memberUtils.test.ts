@@ -1,4 +1,4 @@
-import { GuildMember, type APIInteractionGuildMember } from "discord.js";
+import { GuildMember } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { extractMemberRoleIds } from "../src/utils/memberUtils.ts";
 
@@ -11,7 +11,7 @@ describe("extractMemberRoleIds", () => {
   });
 
   it("extracts roles from APIInteractionGuildMember and includes guildId (@everyone)", () => {
-    const apiMember: APIInteractionGuildMember = {
+    const apiMember = {
       roles: ["role_1", "role_2"],
       joined_at: "2026-01-01T00:00:00.000Z",
       deaf: false,
@@ -26,7 +26,7 @@ describe("extractMemberRoleIds", () => {
   });
 
   it("does not duplicate guildId if APIInteractionGuildMember already contains guildId", () => {
-    const apiMember: APIInteractionGuildMember = {
+    const apiMember = {
       roles: ["role_1", "guild_123"],
       joined_at: "2026-01-01T00:00:00.000Z",
       deaf: false,
