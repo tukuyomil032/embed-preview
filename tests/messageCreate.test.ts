@@ -246,4 +246,63 @@ describe("MessageCreate Event Integration with Settings", () => {
 
     expect(previewMessageLink).toHaveBeenCalled();
   });
+
+  it("should allow preview in whitelist mode when user is whitelisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.users.push("user_white");
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_white",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
+
+  it("should block preview in whitelist mode when user is not whitelisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.users = [];
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "unlisted_user",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).not.toHaveBeenCalled();
+  });
+
+  it("should handle member: null gracefully when processing in a guild", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "blacklist";
+    await settingsManager.setSettings("123", settings);
+
+    const message = {
+      ...createMockMessage({
+        guildId: "123",
+        channelId: "456",
+        userId: "user_no_member",
+      }),
+      member: null,
+    } as unknown as Message;
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
 });

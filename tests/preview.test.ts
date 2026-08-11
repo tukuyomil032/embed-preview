@@ -48,6 +48,18 @@ describe("handlePreviewCommand", () => {
     });
   });
 
+  it("deferReplyが失敗した場合はログを出力して処理を中断する", async () => {
+    const interaction = createMockInteraction();
+    interaction.deferReply = vi.fn().mockRejectedValue(new Error("defer error"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(consoleSpy).toHaveBeenCalledWith("[preview] Failed to defer reply:", expect.any(Error));
+    expect(interaction.followUp).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
   it("メッセージ取得失敗時はMessage not foundを返す", async () => {
     const interaction = createMockInteraction();
     vi.mocked(fetchTargetMessage).mockResolvedValue(null);

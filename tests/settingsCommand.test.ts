@@ -39,9 +39,14 @@ function createMockInteraction(
 const mockPermissions = { has: vi.fn().mockReturnValue(true) };
 
 describe("設定コマンド バックエンドハンドラー", () => {
+  const originalFilepath = (settingsManager as any).filepath;
+  const originalCache = (settingsManager as any).cache;
+  const originalIsLoaded = (settingsManager as any).isLoaded;
+
   beforeEach(async () => {
     (settingsManager as any).filepath = TEST_FILE;
     (settingsManager as any).cache = { guilds: {} };
+    (settingsManager as any).isLoaded = true;
     pendingDeletes.clear();
     if (fs.existsSync(TEST_FILE)) {
       await fs.promises.unlink(TEST_FILE);
@@ -50,6 +55,9 @@ describe("設定コマンド バックエンドハンドラー", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    (settingsManager as any).filepath = originalFilepath;
+    (settingsManager as any).cache = originalCache;
+    (settingsManager as any).isLoaded = originalIsLoaded;
     if (fs.existsSync(TEST_FILE)) {
       try {
         await fs.promises.unlink(TEST_FILE);
@@ -119,6 +127,12 @@ describe("設定コマンド バックエンドハンドラー", () => {
 
     const settings = settingsManager.getSettings("guild_123");
     expect(settings.mode).toBe("whitelist");
+
+    // Verify disk file updated
+    const diskContent = await fs.promises.readFile(TEST_FILE, "utf-8");
+    const parsedDisk = JSON.parse(diskContent);
+    expect(parsedDisk.guilds["guild_123"]?.mode).toBe("whitelist");
+
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         components: expect.any(Array),
