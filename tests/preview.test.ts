@@ -48,6 +48,18 @@ describe("handlePreviewCommand", () => {
     });
   });
 
+  it("Discordのメッセージリンクでない文字列の場合はInvalid message linkを返す", async () => {
+    const interaction = createMockInteraction("https://example.com/not-a-discord-link");
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.followUp).toHaveBeenCalledWith({
+      content: "Invalid message link.",
+      flags: [MessageFlags.Ephemeral],
+    });
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+  });
+
   it("deferReplyが失敗した場合はログを出力して処理を中断する", async () => {
     const interaction = createMockInteraction();
     interaction.deferReply = vi.fn().mockRejectedValue(new Error("defer error"));
@@ -126,6 +138,10 @@ describe("registerSlashCommands", () => {
 const TEST_FILE = path.resolve("tests/temp-preview-settings.json");
 
 describe("Preview Command Integration with Settings", () => {
+  const originalFilepath = (settingsManager as any).filepath;
+  const originalCache = (settingsManager as any).cache;
+  const originalIsLoaded = (settingsManager as any).isLoaded;
+
   beforeEach(async () => {
     vi.clearAllMocks();
     (settingsManager as any).filepath = TEST_FILE;
@@ -137,11 +153,14 @@ describe("Preview Command Integration with Settings", () => {
   });
 
   afterEach(async () => {
+    (settingsManager as any).filepath = originalFilepath;
+    (settingsManager as any).cache = originalCache;
+    (settingsManager as any).isLoaded = originalIsLoaded;
     if (fs.existsSync(TEST_FILE)) {
       try {
         await fs.promises.unlink(TEST_FILE);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn(`[test] Failed to clean up ${TEST_FILE}:`, err);
       }
     }
   });

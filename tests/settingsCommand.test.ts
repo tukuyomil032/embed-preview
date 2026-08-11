@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type ChatInputCommandInteraction, type Client } from "discord.js";
+import {
+  type ChatInputCommandInteraction,
+  type Client,
+  MessageFlags,
+  PermissionFlagsBits,
+} from "discord.js";
 import {
   buildModeModal,
   buildSettingsComponents,
   handleSettingCommand,
   handleSettingsInteraction,
   pendingDeletes,
+  settingCommand,
 } from "../src/commands/settings.ts";
 import { createDefaultGuildSettings, settingsManager } from "../src/utils/settingsManager.ts";
 
@@ -62,8 +68,8 @@ describe("設定コマンド バックエンドハンドラー", () => {
     if (fs.existsSync(TEST_FILE)) {
       try {
         await fs.promises.unlink(TEST_FILE);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn(`[test] Failed to clean up ${TEST_FILE}:`, err);
       }
     }
   });
@@ -102,7 +108,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         components: expect.any(Array),
-        flags: expect.arrayContaining([32768]),
+        flags: expect.arrayContaining([MessageFlags.IsComponentsV2]),
       }),
     );
   });
@@ -137,7 +143,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         components: expect.any(Array),
-        flags: expect.arrayContaining([32768]),
+        flags: expect.arrayContaining([MessageFlags.IsComponentsV2]),
       }),
     );
   });
@@ -170,6 +176,35 @@ describe("設定コマンド バックエンドハンドラー", () => {
     expect(settings.blacklist.channels).toContain("111122223333");
     expect(settings.blacklist.users).toContain("444455556666");
     expect(settings.blacklist.roles).toContain("777788889999");
+
+    const diskContent = await fs.promises.readFile(TEST_FILE, "utf-8");
+    const parsedDisk = JSON.parse(diskContent);
+    expect(parsedDisk.guilds["guild_123"]?.blacklist.channels).toContain("111122223333");
+  });
+
+  it("settings_modal:add:blacklist送信時にチェックボックス未確認なら追加されない", async () => {
+    await settingsManager.load();
+    const update = vi.fn().mockResolvedValue(undefined);
+    const mockAddModalInteraction = {
+      guildId: "guild_123",
+      customId: "settings_modal:add:blacklist",
+      memberPermissions: mockPermissions,
+      fields: {
+        getCheckboxGroup: vi.fn().mockReturnValue([]),
+        getChannelSelectMenuValues: vi.fn((id: string) =>
+          id === "add_channels" ? ["111122223333"] : [],
+        ),
+      },
+      update,
+    } as any;
+
+    await handleSettingsInteraction(mockAddModalInteraction, {} as Client);
+
+    const settings = settingsManager.getSettings("guild_123");
+    expect(settings.blacklist.channels).not.toContain("111122223333");
+
+    const diskContent = await fs.promises.readFile(TEST_FILE, "utf-8");
+    expect(diskContent).not.toContain("111122223333");
   });
 
   it("登録アイテムが0件のときに削除を選択した場合はモーダルを表示せずエラーを返信する", async () => {
@@ -191,7 +226,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     expect(reply).toHaveBeenCalledWith(
       expect.objectContaining({
         components: expect.any(Array),
-        flags: expect.arrayContaining([64]),
+        flags: expect.arrayContaining([MessageFlags.Ephemeral]),
       }),
     );
   });
@@ -273,6 +308,9 @@ describe("設定コマンド バックエンドハンドラー", () => {
 
     const updatedSettings = settingsManager.getSettings("guild_123");
     expect(updatedSettings.blacklist.channels).not.toContain("channel_target_1");
+
+    const diskContent = await fs.promises.readFile(TEST_FILE, "utf-8");
+    expect(diskContent).not.toContain("channel_target_1");
   });
 
   it("各画面のBackボタンが1つ前の画面に戻るインタラクションを正しく処理する", async () => {
@@ -333,6 +371,87 @@ describe("設定コマンド バックエンドハンドラー", () => {
         components: expect.any(Array),
       }),
     );
+  });
+
+  it("デフォルト権限はManageGuildの1つだけが設定される", () => {
+    expect(settingCommand.toJSON().default_member_permissions).toBe(
+      String(PermissionFlagsBits.ManageGuild),
+    );
+  });
+
+  it("番号入力が大量の桁数でも例外を投げずに処理される", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("guild_123");
+    settings.blacklist.channels.push("channel_target_1");
+    await settingsManager.setSettings("guild_123", settings);
+
+    const update = vi.fn().mockResolvedValue(undefined);
+    const oversizedIndices = Array.from({ length: 200 }, (_, i) => i + 1).join(", ");
+    const mockDeleteIndexModalSubmit = {
+      guildId: "guild_123",
+      customId: "settings_modal:delete_by_index:blacklist",
+      memberPermissions: mockPermissions,
+      fields: {
+        getCheckboxGroup: vi.fn((id: string) => (id === "delete_confirm" ? ["Yes"] : [])),
+        getTextInputValue: vi.fn((id: string) => (id === "delete_indices" ? oversizedIndices : "")),
+      },
+      update,
+    } as any;
+
+    await expect(
+      handleSettingsInteraction(mockDeleteIndexModalSubmit, {} as Client),
+    ).resolves.not.toThrow();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ components: expect.any(Array) }));
+
+    const sessionKey = Array.from(pendingDeletes.keys()).find((k) => k.startsWith("blacklist_"));
+    expect(sessionKey).toBeDefined();
+    const customId = `settings:confirm_delete_yes:blacklist:${sessionKey}`;
+    expect(customId.length).toBeLessThanOrEqual(100);
+  });
+
+  it("guildが非nullの場合、削除画面はメンバー/ロール/チャンネル名を解決して表示する", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("guild_123");
+    settings.blacklist.users.push("user_1");
+    await settingsManager.setSettings("guild_123", settings);
+
+    const fetchedMembers = new Map([
+      ["user_1", { user: { username: "Alice" }, displayName: "Alice" }],
+    ]);
+    const mockGuild = {
+      members: {
+        cache: new Map(),
+        fetch: vi.fn().mockResolvedValue(fetchedMembers),
+      },
+      roles: {
+        cache: new Map(),
+        fetch: vi.fn().mockResolvedValue(new Map()),
+      },
+      channels: {
+        cache: new Map(),
+        fetch: vi.fn().mockResolvedValue(new Map()),
+      },
+    };
+
+    const update = vi.fn().mockResolvedValue(undefined);
+    const mockSelectDeleteInteraction = {
+      guildId: "guild_123",
+      customId: "settings:select_list:delete:blacklist",
+      memberPermissions: mockPermissions,
+      guild: mockGuild,
+      update,
+    } as any;
+
+    await handleSettingsInteraction(mockSelectDeleteInteraction, {} as Client);
+
+    expect(mockGuild.members.fetch).toHaveBeenCalledWith({ user: ["user_1"] });
+    const [container] = update.mock.calls[0]![0].components;
+    const text = container
+      .toJSON()
+      .components.filter((c: any) => typeof c.content === "string")
+      .map((c: any) => c.content)
+      .join("\n");
+    expect(text).toContain("Alice");
   });
 });
 

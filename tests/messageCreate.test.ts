@@ -102,6 +102,9 @@ const TEST_FILE = path.resolve("tests/temp-message-settings.json");
 describe("MessageCreate Event Integration with Settings", () => {
   let client: Client;
   let eventCallback: ((message: Message) => Promise<void>) | undefined;
+  const originalFilepath = (settingsManager as any).filepath;
+  const originalCache = (settingsManager as any).cache;
+  const originalIsLoaded = (settingsManager as any).isLoaded;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -125,11 +128,14 @@ describe("MessageCreate Event Integration with Settings", () => {
   });
 
   afterEach(async () => {
+    (settingsManager as any).filepath = originalFilepath;
+    (settingsManager as any).cache = originalCache;
+    (settingsManager as any).isLoaded = originalIsLoaded;
     if (fs.existsSync(TEST_FILE)) {
       try {
         await fs.promises.unlink(TEST_FILE);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn(`[test] Failed to clean up ${TEST_FILE}:`, err);
       }
     }
   });
@@ -148,9 +154,6 @@ describe("MessageCreate Event Integration with Settings", () => {
         cache.set(roleId, { id: roleId });
       }
     }
-    (cache as any).map = (fn: (val: any, key: any) => any) => {
-      return Array.from(cache.values()).map(fn);
-    };
 
     return {
       author: {
@@ -258,6 +261,26 @@ describe("MessageCreate Event Integration with Settings", () => {
       guildId: "123",
       channelId: "456",
       userId: "user_white",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
+
+  it("should allow preview if @everyone (guildId) is whitelisted even though it's absent from the role cache", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.roles.push("123"); // @everyone role ID
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: ["other_role"], // does not contain '123' explicitly
     });
 
     expect(eventCallback).toBeDefined();

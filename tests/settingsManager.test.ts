@@ -17,8 +17,8 @@ describe("SettingsManager", () => {
       if (fs.existsSync(TEST_FILE)) {
         await fs.promises.unlink(TEST_FILE);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn(`[test] Failed to clean up ${TEST_FILE}:`, err);
     }
   });
 
@@ -105,6 +105,54 @@ describe("SettingsManager", () => {
 
       const result = manager.getSettings("g_race");
       expect(result.mode).toBe("whitelist");
+    });
+
+    it("既存の設定を読み込んだ後に破損したJSONを再読み込みしても既存のキャッシュは破棄されない", async () => {
+      await manager.load();
+      const goodSettings = createDefaultGuildSettings();
+      goodSettings.blacklist.users.push("preserved_user");
+      await manager.setSettings("g1", goodSettings);
+
+      await fs.promises.writeFile(TEST_FILE, "{ this is not valid json", "utf-8");
+      await manager.load();
+
+      expect(manager.getIsLoaded()).toBe(false);
+      // isAllowed fails closed regardless, but the underlying cache itself must
+      // survive so a subsequent successful load doesn't lose the data either.
+      expect((manager as any).cache.guilds.g1.blacklist.users).toContain("preserved_user");
+    });
+
+    it("writeQueue により複数の setSettings が直列化され、最終的なファイルは全guildを含む有効なJSONになる", async () => {
+      await manager.load();
+
+      const guildIds = Array.from({ length: 10 }, (_, i) => `g_concurrent_${i}`);
+      await Promise.all(
+        guildIds.map((id) => {
+          const settings = createDefaultGuildSettings();
+          settings.blacklist.channels.push(id);
+          return manager.setSettings(id, settings);
+        }),
+      );
+
+      const content = await fs.promises.readFile(TEST_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      for (const id of guildIds) {
+        expect(parsed.guilds[id]?.blacklist.channels).toContain(id);
+      }
+    });
+  });
+
+  describe("未登録ギルドの扱い", () => {
+    it("未登録のギルドIDにはデフォルト設定を返し、変更してもキャッシュに影響しない", async () => {
+      await manager.load();
+
+      const settings = manager.getSettings("never_seen_guild");
+      expect(settings.mode).toBe("blacklist");
+      expect(settings.blacklist.channels).toEqual([]);
+
+      settings.blacklist.channels.push("mutated_after_return");
+      const settingsAgain = manager.getSettings("never_seen_guild");
+      expect(settingsAgain.blacklist.channels).toEqual([]);
     });
   });
 
