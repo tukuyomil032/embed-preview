@@ -3,12 +3,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { type ChatInputCommandInteraction, type Client } from "discord.js";
 import {
+  buildSettingsComponents,
   handleSettingCommand,
   handleSettingsInteraction,
-  handleSettingsRemoveInteraction,
   pendingDeletes,
 } from "../src/commands/settings.ts";
-import { settingsManager } from "../src/utils/settingsManager.ts";
+import { createDefaultGuildSettings, settingsManager } from "../src/utils/settingsManager.ts";
 
 const TEST_FILE = path.resolve("tests/temp-command-settings.json");
 
@@ -333,31 +333,37 @@ describe("設定コマンド バックエンドハンドラー", () => {
       }),
     );
   });
+});
 
-  it("settings_removeインタラクションで項目が削除されsettings.jsonから除去される", async () => {
-    await settingsManager.load();
-    const initSettings = settingsManager.getSettings("guild_123");
-    initSettings.blacklist.users.push("user_888");
-    await settingsManager.setSettings("guild_123", initSettings);
+describe("buildSettingsComponents", () => {
+  it("リストが20件を超える場合はサマリーを切り詰めて残数を表示する", () => {
+    const settings = createDefaultGuildSettings();
+    settings.blacklist.channels = Array.from({ length: 25 }, (_, i) => `chan_${i}`);
 
-    const update = vi.fn().mockResolvedValue(undefined);
-    const mockRemoveInteraction = {
-      guildId: "guild_123",
-      customId: "settings_remove",
-      memberPermissions: mockPermissions,
-      values: ["blacklist:users:user_888"],
-      update,
-    } as any;
+    const [container] = buildSettingsComponents({} as any, null, settings);
+    const json = (container as any).toJSON();
+    const summaryText = json.components
+      .filter((c: any) => typeof c.content === "string")
+      .map((c: any) => c.content)
+      .join("\n");
 
-    await handleSettingsRemoveInteraction(mockRemoveInteraction, {} as Client);
+    expect(summaryText).toContain("and 5 more");
+    expect(summaryText).not.toContain("<#chan_24>");
+  });
 
-    const settings = settingsManager.getSettings("guild_123");
-    expect(settings.blacklist.users).not.toContain("user_888");
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        components: expect.any(Array),
-        flags: expect.arrayContaining([32768]),
-      }),
-    );
+  it("リストが20件以下の場合は省略しない", () => {
+    const settings = createDefaultGuildSettings();
+    settings.blacklist.users = ["u1", "u2"];
+
+    const [container] = buildSettingsComponents({} as any, null, settings);
+    const json = (container as any).toJSON();
+    const summaryText = json.components
+      .filter((c: any) => typeof c.content === "string")
+      .map((c: any) => c.content)
+      .join("\n");
+
+    expect(summaryText).toContain("<@u1>");
+    expect(summaryText).toContain("<@u2>");
+    expect(summaryText).not.toContain("more");
   });
 });

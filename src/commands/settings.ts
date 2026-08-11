@@ -25,7 +25,7 @@ import {
   StringSelectMenuOptionBuilder,
   PermissionFlagsBits,
 } from "discord.js";
-import { settingsManager, type GuildSettings } from "../utils/settingsManager.ts";
+import { settingsManager, type GuildSettings, type ListConfig } from "../utils/settingsManager.ts";
 
 /**
  * Session store for pending delete operations.
@@ -651,42 +651,6 @@ export async function handleSettingsInteraction(interaction: any, _client: Clien
       return;
     }
 
-    if (typeof customId === "string" && customId.startsWith("settings:add:")) {
-      const parts = customId.split(":");
-      const type = parts[2] as "whitelist" | "blacklist";
-      const targetType = parts[3] as "channels" | "users" | "roles";
-
-      if (type && targetType && interaction.values && interaction.values.length > 0) {
-        const list = settings[type];
-        if (list && Array.isArray(list[targetType])) {
-          for (const id of interaction.values) {
-            if (!list[targetType].includes(id)) {
-              list[targetType].push(id);
-            }
-          }
-          await settingsManager.setSettings(guildId, settings);
-        }
-      }
-    } else if (
-      customId === "settings_remove" ||
-      (typeof customId === "string" && customId.startsWith("settings:remove"))
-    ) {
-      const selectedValue = interaction.values?.[0];
-      if (selectedValue) {
-        const [type, targetType, id] = selectedValue.split(":") as [
-          "whitelist" | "blacklist",
-          "channels" | "users" | "roles",
-          string,
-        ];
-        if (type && targetType && id && settings[type]?.[targetType]) {
-          settings[type][targetType] = settings[type][targetType].filter(
-            (existingId: string) => existingId !== id,
-          );
-          await settingsManager.setSettings(guildId, settings);
-        }
-      }
-    }
-
     const components = buildSettingsComponents(_client, interaction.guild, settings);
     await interaction.update({
       components,
@@ -710,13 +674,6 @@ export async function handleSettingsInteraction(interaction: any, _client: Clien
       console.error("[settings_interaction] Failed to send fallback error response:", replyErr);
     }
   }
-}
-
-export async function handleSettingsRemoveInteraction(
-  interaction: any,
-  client: Client,
-): Promise<void> {
-  return handleSettingsInteraction(interaction, client);
 }
 
 // Builds the UI components for the settings command
@@ -747,17 +704,24 @@ export function buildSettingsComponents(
     new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true),
   );
 
+  const MAX_SHOWN = 20;
+  const formatIds = (ids: string[], wrap: (id: string) => string): string => {
+    if (ids.length === 0) return "None";
+    const shown = ids.slice(0, MAX_SHOWN).map(wrap).join(", ");
+    return ids.length > MAX_SHOWN ? `${shown} … and ${ids.length - MAX_SHOWN} more` : shown;
+  };
+
   const blacklistSummary =
     `**Blacklist**\n` +
-    `• Channels: ${blacklist.channels.length > 0 ? blacklist.channels.map((id) => `<#${id}>`).join(", ") : "None"}\n` +
-    `• Users: ${blacklist.users.length > 0 ? blacklist.users.map((id) => `<@${id}>`).join(", ") : "None"}\n` +
-    `• Roles: ${blacklist.roles.length > 0 ? blacklist.roles.map((id) => `<@&${id}>`).join(", ") : "None"}`;
+    `• Channels: ${formatIds(blacklist.channels, (id) => `<#${id}>`)}\n` +
+    `• Users: ${formatIds(blacklist.users, (id) => `<@${id}>`)}\n` +
+    `• Roles: ${formatIds(blacklist.roles, (id) => `<@&${id}>`)}`;
 
   const whitelistSummary =
     `**Whitelist**\n` +
-    `• Channels: ${whitelist.channels.length > 0 ? whitelist.channels.map((id) => `<#${id}>`).join(", ") : "None"}\n` +
-    `• Users: ${whitelist.users.length > 0 ? whitelist.users.map((id) => `<@${id}>`).join(", ") : "None"}\n` +
-    `• Roles: ${whitelist.roles.length > 0 ? whitelist.roles.map((id) => `<@&${id}>`).join(", ") : "None"}`;
+    `• Channels: ${formatIds(whitelist.channels, (id) => `<#${id}>`)}\n` +
+    `• Users: ${formatIds(whitelist.users, (id) => `<@${id}>`)}\n` +
+    `• Roles: ${formatIds(whitelist.roles, (id) => `<@&${id}>`)}`;
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(`${blacklistSummary}\n\n${whitelistSummary}`),
@@ -884,6 +848,68 @@ export function buildAddModal(listType: "whitelist" | "blacklist"): ModalBuilder
 /**
  * Builds the modal for deleting registered items (normal case)
  */
+/**
+ * Resolves display names for a list's users/roles/channels in a small, fixed
+ * number of bulk requests instead of one fetch per item, so this stays well
+ * under Discord's 3-second interaction deadline as a list grows.
+ */
+async function resolveListNames(
+  guild: any,
+  targetList: ListConfig,
+): Promise<{
+  users: Map<string, string>;
+  roles: Map<string, string>;
+  channels: Map<string, string>;
+}> {
+  const users = new Map<string, string>();
+  const roles = new Map<string, string>();
+  const channels = new Map<string, string>();
+
+  if (!guild) return { users, roles, channels };
+
+  if (targetList.users.length > 0) {
+    try {
+      const fetched = await guild.members?.fetch({ user: targetList.users });
+      for (const [id, member] of fetched ?? []) {
+        users.set(id, member.user?.username || member.displayName || id);
+      }
+    } catch (err) {
+      console.warn("[settings] Failed to bulk-fetch members:", err);
+    }
+    for (const id of targetList.users) {
+      if (users.has(id)) continue;
+      const cached = guild.members?.cache?.get(id);
+      if (cached) users.set(id, cached.user?.username || cached.displayName || id);
+    }
+  }
+
+  if (targetList.roles.length > 0) {
+    try {
+      const fetched = await guild.roles?.fetch();
+      for (const id of targetList.roles) {
+        const role = fetched?.get(id) ?? guild.roles?.cache?.get(id);
+        if (role) roles.set(id, role.name);
+      }
+    } catch (err) {
+      console.warn("[settings] Failed to bulk-fetch roles:", err);
+    }
+  }
+
+  if (targetList.channels.length > 0) {
+    try {
+      const fetched = await guild.channels?.fetch();
+      for (const id of targetList.channels) {
+        const channel = fetched?.get(id) ?? guild.channels?.cache?.get(id);
+        if (channel) channels.set(id, channel.name);
+      }
+    } catch (err) {
+      console.warn("[settings] Failed to bulk-fetch channels:", err);
+    }
+  }
+
+  return { users, roles, channels };
+}
+
 export async function buildDeleteModal(
   listType: "whitelist" | "blacklist",
   settings: GuildSettings,
@@ -899,20 +925,11 @@ export async function buildDeleteModal(
     );
 
   const targetList = settings[listType];
+  const names = await resolveListNames(guild, targetList);
 
   const userOptions: StringSelectMenuOptionBuilder[] = [];
   for (const id of targetList.users) {
-    let name = id;
-    if (guild) {
-      try {
-        const member =
-          guild.members?.cache?.get(id) || (await guild.members?.fetch(id).catch(() => null));
-        if (member) {
-          name = member.user?.username || member.displayName || id;
-        }
-      } catch {}
-    }
-    const label = `@${name} (${id})`.slice(0, 100);
+    const label = `@${names.users.get(id) ?? id} (${id})`.slice(0, 100);
     userOptions.push(
       new StringSelectMenuOptionBuilder().setLabel(label).setValue(`${listType}:users:${id}`),
     );
@@ -920,17 +937,7 @@ export async function buildDeleteModal(
 
   const roleOptions: StringSelectMenuOptionBuilder[] = [];
   for (const id of targetList.roles) {
-    let name = id;
-    if (guild) {
-      try {
-        const role =
-          guild.roles?.cache?.get(id) || (await guild.roles?.fetch(id).catch(() => null));
-        if (role) {
-          name = role.name || id;
-        }
-      } catch {}
-    }
-    const label = `@${name} (${id})`.slice(0, 100);
+    const label = `@${names.roles.get(id) ?? id} (${id})`.slice(0, 100);
     roleOptions.push(
       new StringSelectMenuOptionBuilder().setLabel(label).setValue(`${listType}:roles:${id}`),
     );
@@ -938,17 +945,7 @@ export async function buildDeleteModal(
 
   const channelOptions: StringSelectMenuOptionBuilder[] = [];
   for (const id of targetList.channels) {
-    let name = id;
-    if (guild) {
-      try {
-        const channel =
-          guild.channels?.cache?.get(id) || (await guild.channels?.fetch(id).catch(() => null));
-        if (channel) {
-          name = channel.name || id;
-        }
-      } catch {}
-    }
-    const label = `#${name} (${id})`.slice(0, 100);
+    const label = `#${names.channels.get(id) ?? id} (${id})`.slice(0, 100);
     channelOptions.push(
       new StringSelectMenuOptionBuilder().setLabel(label).setValue(`${listType}:channels:${id}`),
     );
@@ -1025,55 +1022,29 @@ export async function buildDeleteFallbackComponents(
 ): Promise<any[]> {
   const container = new ContainerBuilder().setAccentColor(0xed4245);
   const targetList = settings[listType];
+  const names = await resolveListNames(guild, targetList);
 
   let index = 1;
   let textList = `## Registered ${listType === "blacklist" ? "Blacklist" : "Whitelist"} Items\n\n`;
 
   if (targetList.users.length > 0) {
-    const userLines: string[] = [];
-    for (const id of targetList.users) {
-      let name = id;
-      if (guild) {
-        try {
-          const member =
-            guild.members?.cache?.get(id) || (await guild.members?.fetch(id).catch(() => null));
-          if (member) name = member.user?.username || member.displayName || id;
-        } catch {}
-      }
-      userLines.push(`#${index++} ${name} (${id})`);
-    }
+    const userLines = targetList.users.map(
+      (id) => `#${index++} ${names.users.get(id) ?? id} (${id})`,
+    );
     textList += `**Users:**\n\`\`\`\n${userLines.join("\n")}\n\`\`\`\n\n`;
   }
 
   if (targetList.roles.length > 0) {
-    const roleLines: string[] = [];
-    for (const id of targetList.roles) {
-      let name = id;
-      if (guild) {
-        try {
-          const role =
-            guild.roles?.cache?.get(id) || (await guild.roles?.fetch(id).catch(() => null));
-          if (role) name = role.name || id;
-        } catch {}
-      }
-      roleLines.push(`#${index++} ${name} (${id})`);
-    }
+    const roleLines = targetList.roles.map(
+      (id) => `#${index++} ${names.roles.get(id) ?? id} (${id})`,
+    );
     textList += `**Roles:**\n\`\`\`\n${roleLines.join("\n")}\n\`\`\`\n\n`;
   }
 
   if (targetList.channels.length > 0) {
-    const channelLines: string[] = [];
-    for (const id of targetList.channels) {
-      let name = id;
-      if (guild) {
-        try {
-          const ch =
-            guild.channels?.cache?.get(id) || (await guild.channels?.fetch(id).catch(() => null));
-          if (ch) name = ch.name || id;
-        } catch {}
-      }
-      channelLines.push(`#${index++} ${name} (${id})`);
-    }
+    const channelLines = targetList.channels.map(
+      (id) => `#${index++} ${names.channels.get(id) ?? id} (${id})`,
+    );
     textList += `**Channels:**\n\`\`\`\n${channelLines.join("\n")}\n\`\`\`\n\n`;
   }
 
@@ -1150,6 +1121,7 @@ export async function buildDeleteConfirmComponents(
 ): Promise<any[]> {
   const container = new ContainerBuilder().setAccentColor(0xed4245);
   const targetList = settings[listType];
+  const names = await resolveListNames(guild, targetList);
 
   const allItems: { type: "channels" | "users" | "roles"; id: string; num: number }[] = [];
   let index = 1;
@@ -1159,32 +1131,11 @@ export async function buildDeleteConfirmComponents(
 
   const selectedItems = allItems.filter((item) => numbers.includes(item.num));
 
-  const lines: string[] = [];
-  for (const item of selectedItems) {
-    let name = item.id;
-    if (guild) {
-      try {
-        if (item.type === "users") {
-          const member =
-            guild.members?.cache?.get(item.id) ||
-            (await guild.members?.fetch(item.id).catch(() => null));
-          if (member) name = member.user?.username || member.displayName || item.id;
-        } else if (item.type === "roles") {
-          const role =
-            guild.roles?.cache?.get(item.id) ||
-            (await guild.roles?.fetch(item.id).catch(() => null));
-          if (role) name = role.name || item.id;
-        } else if (item.type === "channels") {
-          const ch =
-            guild.channels?.cache?.get(item.id) ||
-            (await guild.channels?.fetch(item.id).catch(() => null));
-          if (ch) name = ch.name || item.id;
-        }
-      } catch {}
-    }
+  const lines: string[] = selectedItems.map((item) => {
+    const name = names[item.type].get(item.id) ?? item.id;
     const prefix = item.type === "channels" ? "#" : "@";
-    lines.push(`• #${item.num} ${prefix}${name} (${item.id})`);
-  }
+    return `• #${item.num} ${prefix}${name} (${item.id})`;
+  });
 
   let text = `## ⚠️ Confirmation\nRemove these users, roles, and channels from the list. Are you sure?\n\n**Items for deletion:**\n\`\`\`\n`;
   text += lines.length > 0 ? lines.join("\n") : "No matching items were found.";
