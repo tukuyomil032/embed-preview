@@ -6,6 +6,7 @@ import {
   handleSettingCommand,
   handleSettingsInteraction,
   handleSettingsRemoveInteraction,
+  pendingDeletes,
 } from "../src/commands/settings.ts";
 import { settingsManager } from "../src/utils/settingsManager.ts";
 
@@ -41,6 +42,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
   beforeEach(async () => {
     (settingsManager as any).filepath = TEST_FILE;
     (settingsManager as any).cache = { guilds: {} };
+    pendingDeletes.clear();
     if (fs.existsSync(TEST_FILE)) {
       await fs.promises.unlink(TEST_FILE);
     }
@@ -221,10 +223,14 @@ describe("設定コマンド バックエンドハンドラー", () => {
       }),
     );
 
+    // Extract the session key created by buildDeleteConfirmComponents
+    const sessionKey = Array.from(pendingDeletes.keys()).find((k) => k.startsWith("blacklist_"));
+    expect(sessionKey).toBeDefined();
+
     // 2. Cancel ボタン押下時、モーダルが入力値付きで再表示されること
     const mockCancelInteraction = {
       guildId: "guild_123",
-      customId: "settings:confirm_delete_cancel:blacklist:1",
+      customId: `settings:confirm_delete_cancel:blacklist:${sessionKey}`,
       memberPermissions: mockPermissions,
       showModal,
       update,
@@ -233,10 +239,17 @@ describe("設定コマンド バックエンドハンドラー", () => {
     await handleSettingsInteraction(mockCancelInteraction, {} as Client);
     expect(showModal).toHaveBeenCalled();
 
+    // Re-submit to create a new session for the Yes step
+    await handleSettingsInteraction(mockDeleteIndexModalSubmit, {} as Client);
+    const sessionKey2 = Array.from(pendingDeletes.keys()).find(
+      (k) => k.startsWith("blacklist_") && k !== sessionKey,
+    );
+    expect(sessionKey2).toBeDefined();
+
     // 3. Yes ボタン押下時、実際の削除が完了すること
     const mockYesInteraction = {
       guildId: "guild_123",
-      customId: "settings:confirm_delete_yes:blacklist:1",
+      customId: `settings:confirm_delete_yes:blacklist:${sessionKey2}`,
       memberPermissions: mockPermissions,
       update,
     } as any;

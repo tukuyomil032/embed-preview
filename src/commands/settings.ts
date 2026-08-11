@@ -27,6 +27,28 @@ import {
 } from "discord.js";
 import { settingsManager, type GuildSettings } from "../utils/settingsManager.ts";
 
+/**
+ * Session store for pending delete operations.
+ * Maps a short session key to the resolved IDs at confirmation time,
+ * preventing TOCTOU issues from index-based deletion.
+ * Entries expire after 5 minutes.
+ */
+const PENDING_DELETE_TTL_MS = 5 * 60 * 1000;
+const pendingDeletes = new Map<string, { ids: Set<string>; listType: string; createdAt: number }>();
+
+function createPendingDeleteKey(listType: string, idsToRemove: Set<string>): string {
+  const key = `${listType}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  pendingDeletes.set(key, { ids: idsToRemove, listType, createdAt: Date.now() });
+  // Cleanup expired entries
+  for (const [k, v] of pendingDeletes) {
+    if (Date.now() - v.createdAt > PENDING_DELETE_TTL_MS) pendingDeletes.delete(k);
+  }
+  return key;
+}
+
+/** Exported for testing */
+export { pendingDeletes };
+
 const createToggleButton = (): ButtonBuilder =>
   new ButtonBuilder()
     .setCustomId("settings:toggle_mode")
@@ -200,7 +222,9 @@ function extractFieldValues(fields: any, targetCustomId: string): string[] {
       const v = fields.getTextInputValue(targetCustomId);
       if (typeof v === "string" && v.length > 0) return [v];
     }
-  } catch {}
+  } catch (err) {
+    console.debug("[extractFieldValues] Failed method lookup for %s:", targetCustomId, err);
+  }
 
   try {
     const rawFields = fields.fields || fields.components;
@@ -219,7 +243,9 @@ function extractFieldValues(fields: any, targetCustomId: string): string[] {
         }
       }
     }
-  } catch {}
+  } catch (err) {
+    console.debug("[extractFieldValues] Failed rawFields inspection for %s:", targetCustomId, err);
+  }
 
   try {
     const directObj = fields[targetCustomId] || fields.getField?.(targetCustomId);
@@ -227,7 +253,9 @@ function extractFieldValues(fields: any, targetCustomId: string): string[] {
       if (Array.isArray(directObj.values)) return directObj.values;
       if (typeof directObj.value === "string") return [directObj.value];
     }
-  } catch {}
+  } catch (err) {
+    console.debug("[extractFieldValues] Failed directObj lookup for %s:", targetCustomId, err);
+  }
 
   return results;
 }
@@ -260,7 +288,9 @@ function isConfirmed(fields: any, confirmCustomId: string): boolean {
         }
       }
     }
-  } catch {}
+  } catch (err) {
+    console.debug("[isConfirmed] Failed rawFields inspection for %s:", confirmCustomId, err);
+  }
 
   return false;
 }
@@ -575,31 +605,31 @@ export async function handleSettingsInteraction(interaction: any, _client: Clien
     if (typeof customId === "string" && customId.startsWith("settings:confirm_delete_yes:")) {
       const parts = customId.split(":");
       const listType = parts[2] as "whitelist" | "blacklist";
-      const indicesStr = parts[3] || "";
-      const numbers = (indicesStr.match(/\d+/g) || []).map(Number);
+      const sessionKey = parts[3] || "";
 
-      if (listType && settings[listType]) {
-        const allItems: { type: "channels" | "users" | "roles"; id: string }[] = [
-          ...settings[listType].users.map((id) => ({ type: "users" as const, id })),
-          ...settings[listType].roles.map((id) => ({ type: "roles" as const, id })),
-          ...settings[listType].channels.map((id) => ({ type: "channels" as const, id })),
-        ];
+      if (listType && settings[listType] && sessionKey) {
+        const pending = pendingDeletes.get(sessionKey);
+        if (pending && pending.listType === listType) {
+          const idsToRemove = pending.ids;
+          pendingDeletes.delete(sessionKey);
 
-        const idsToRemove = new Set<string>();
-        for (const num of numbers) {
-          if (num >= 1 && num <= allItems.length) {
-            const item = allItems[num - 1];
-            if (item) idsToRemove.add(item.id);
+          if (idsToRemove.size > 0) {
+            settings[listType].channels = settings[listType].channels.filter(
+              (id) => !idsToRemove.has(id),
+            );
+            settings[listType].users = settings[listType].users.filter(
+              (id) => !idsToRemove.has(id),
+            );
+            settings[listType].roles = settings[listType].roles.filter(
+              (id) => !idsToRemove.has(id),
+            );
+            await settingsManager.setSettings(guildId, settings);
           }
-        }
-
-        if (idsToRemove.size > 0) {
-          settings[listType].channels = settings[listType].channels.filter(
-            (id) => !idsToRemove.has(id),
+        } else {
+          console.warn(
+            "[settings_interaction] Pending delete session not found or expired:",
+            sessionKey,
           );
-          settings[listType].users = settings[listType].users.filter((id) => !idsToRemove.has(id));
-          settings[listType].roles = settings[listType].roles.filter((id) => !idsToRemove.has(id));
-          await settingsManager.setSettings(guildId, settings);
         }
       }
 
@@ -665,10 +695,17 @@ export async function handleSettingsInteraction(interaction: any, _client: Clien
   } catch (err) {
     console.error("[settings_interaction] Error processing settings interaction:", err);
     try {
-      await interaction.reply({
-        content: "An error occurred while updating the settings.",
-        flags: [MessageFlags.Ephemeral],
-      });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "An error occurred while updating the settings.",
+          flags: [MessageFlags.Ephemeral],
+        });
+      } else {
+        await interaction.reply({
+          content: "An error occurred while updating the settings.",
+          flags: [MessageFlags.Ephemeral],
+        });
+      }
     } catch (replyErr) {
       console.error("[settings_interaction] Failed to send fallback error response:", replyErr);
     }
@@ -1155,7 +1192,9 @@ export async function buildDeleteConfirmComponents(
 
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
 
-  const safeIndicesStr = numbers.slice(0, 20).join(",").slice(0, 40);
+  // Store resolved IDs in session to avoid TOCTOU with index-based deletion
+  const idsToRemove = new Set(selectedItems.map((item) => item.id));
+  const sessionKey = selectedItems.length > 0 ? createPendingDeleteKey(listType, idsToRemove) : "";
 
   const buttonsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -1164,12 +1203,12 @@ export async function buildDeleteConfirmComponents(
       .setEmoji("⬅️")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId(`settings:confirm_delete_yes:${listType}:${safeIndicesStr}`)
+      .setCustomId(`settings:confirm_delete_yes:${listType}:${sessionKey}`)
       .setLabel("Yes")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(lines.length === 0),
+      .setDisabled(selectedItems.length === 0),
     new ButtonBuilder()
-      .setCustomId(`settings:confirm_delete_cancel:${listType}:${safeIndicesStr}`)
+      .setCustomId(`settings:confirm_delete_cancel:${listType}:${sessionKey}`)
       .setLabel("Cancel")
       .setStyle(ButtonStyle.Secondary),
   );
