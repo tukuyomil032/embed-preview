@@ -11,7 +11,10 @@ import { settingsManager } from "../src/utils/settingsManager.ts";
 
 const TEST_FILE = path.resolve("tests/temp-command-settings.json");
 
-function createMockInteraction(guildId: string | null = "guild_123") {
+function createMockInteraction(
+  guildId: string | null = "guild_123",
+  hasPermissions: boolean = true,
+) {
   const deferReply = vi.fn().mockResolvedValue(undefined);
   const followUp = vi.fn().mockResolvedValue(undefined);
   const reply = vi.fn().mockResolvedValue(undefined);
@@ -26,8 +29,13 @@ function createMockInteraction(guildId: string | null = "guild_123") {
     showModal,
     guildId,
     guild: null,
+    memberPermissions: {
+      has: vi.fn().mockReturnValue(hasPermissions),
+    },
   } as unknown as ChatInputCommandInteraction;
 }
+
+const mockPermissions = { has: vi.fn().mockReturnValue(true) };
 
 describe("設定コマンド バックエンドハンドラー", () => {
   beforeEach(async () => {
@@ -62,6 +70,19 @@ describe("設定コマンド バックエンドハンドラー", () => {
     );
   });
 
+  it("管理者/ギルド管理権限がない場合はエラーを返す", async () => {
+    const interaction = createMockInteraction("guild_123", false);
+
+    await handleSettingCommand(interaction, {} as Client);
+
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content:
+          "You do not have permission to manage settings (Manage Server permission required).",
+      }),
+    );
+  });
+
   it("ギルド内で実行された場合はUIコンポーネントで返答する", async () => {
     const interaction = createMockInteraction("guild_123");
 
@@ -84,6 +105,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockModalSubmitInteraction = {
       guildId: "guild_123",
       customId: "settings_modal:black_white",
+      memberPermissions: mockPermissions,
       fields: {
         getTextInputValue: vi.fn().mockReturnValue("whitelist"),
         getCheckboxGroup: vi.fn().mockReturnValue(["Yes"]),
@@ -109,6 +131,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockAddModalInteraction = {
       guildId: "guild_123",
       customId: "settings_modal:add:blacklist",
+      memberPermissions: mockPermissions,
       fields: {
         getCheckboxGroup: vi.fn().mockReturnValue(["Yes"]),
         getChannelSelectMenuValues: vi.fn((id: string) =>
@@ -140,6 +163,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockSelectDeleteZeroInteraction = {
       guildId: "guild_123",
       customId: "settings:select_list:delete:blacklist",
+      memberPermissions: mockPermissions,
       reply,
       showModal,
     } as any;
@@ -167,6 +191,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockSelectDeleteInteraction = {
       guildId: "guild_123",
       customId: "settings:select_list:delete:blacklist",
+      memberPermissions: mockPermissions,
       update,
     } as any;
 
@@ -181,6 +206,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockDeleteIndexModalSubmit = {
       guildId: "guild_123",
       customId: "settings_modal:delete_by_index:blacklist",
+      memberPermissions: mockPermissions,
       fields: {
         getCheckboxGroup: vi.fn((id: string) => (id === "delete_confirm" ? ["Yes"] : [])),
         getTextInputValue: vi.fn((id: string) => (id === "delete_indices" ? "1" : "")),
@@ -199,6 +225,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockCancelInteraction = {
       guildId: "guild_123",
       customId: "settings:confirm_delete_cancel:blacklist:1",
+      memberPermissions: mockPermissions,
       showModal,
       update,
     } as any;
@@ -210,6 +237,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockYesInteraction = {
       guildId: "guild_123",
       customId: "settings:confirm_delete_yes:blacklist:1",
+      memberPermissions: mockPermissions,
       update,
     } as any;
 
@@ -226,6 +254,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockBackFromDeleteList = {
       guildId: "guild_123",
       customId: "settings:back_to_select_target_delete",
+      memberPermissions: mockPermissions,
       update,
     } as any;
     await handleSettingsInteraction(mockBackFromDeleteList, {} as Client);
@@ -239,6 +268,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockBackFromConfirm = {
       guildId: "guild_123",
       customId: "settings:back_to_delete_list:blacklist",
+      memberPermissions: mockPermissions,
       update,
     } as any;
     await handleSettingsInteraction(mockBackFromConfirm, {} as Client);
@@ -252,6 +282,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockBackFromSelectTarget = {
       guildId: "guild_123",
       customId: "settings:back_to_black_white",
+      memberPermissions: mockPermissions,
       update,
     } as any;
     await handleSettingsInteraction(mockBackFromSelectTarget, {} as Client);
@@ -265,6 +296,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockBackToMain = {
       guildId: "guild_123",
       customId: "settings:main",
+      memberPermissions: mockPermissions,
       update,
     } as any;
     await handleSettingsInteraction(mockBackToMain, {} as Client);
@@ -285,6 +317,7 @@ describe("設定コマンド バックエンドハンドラー", () => {
     const mockRemoveInteraction = {
       guildId: "guild_123",
       customId: "settings_remove",
+      memberPermissions: mockPermissions,
       values: ["blacklist:users:user_888"],
       update,
     } as any;

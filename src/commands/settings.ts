@@ -56,7 +56,6 @@ const createBackButton = (): ButtonBuilder =>
 export const settingCommand = new SlashCommandBuilder()
   .setName("settings")
   .setDescription("Configure the bot settings")
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export function buildMainSettingsComponents(guild: any): any[] {
@@ -109,6 +108,16 @@ export function buildMainSettingsComponents(guild: any): any[] {
   return [container];
 }
 
+export function hasManageGuildPermission(interaction: any): boolean {
+  if (!interaction?.memberPermissions || typeof interaction.memberPermissions.has !== "function") {
+    return false;
+  }
+  return (
+    interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild) ||
+    interaction.memberPermissions.has(PermissionFlagsBits.Administrator)
+  );
+}
+
 export async function handleSettingCommand(
   interaction: ChatInputCommandInteraction,
   _client: Client,
@@ -122,6 +131,19 @@ export async function handleSettingCommand(
       });
     } catch (err) {
       console.error("[settings] Failed to send guild-only error response:", err);
+    }
+    return;
+  }
+
+  if (!hasManageGuildPermission(interaction)) {
+    try {
+      await interaction.reply({
+        content:
+          "You do not have permission to manage settings (Manage Server permission required).",
+        flags: [MessageFlags.Ephemeral],
+      });
+    } catch (err) {
+      console.error("[settings] Failed to send permission error response:", err);
     }
     return;
   }
@@ -253,6 +275,27 @@ export async function handleSettingsInteraction(interaction: any, _client: Clien
       });
     } catch (err) {
       console.error("[settings_interaction] Failed to send guild-only error response:", err);
+    }
+    return;
+  }
+
+  if (!hasManageGuildPermission(interaction)) {
+    try {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content:
+            "You do not have permission to manage settings (Manage Server permission required).",
+          flags: [MessageFlags.Ephemeral],
+        });
+      } else {
+        await interaction.reply({
+          content:
+            "You do not have permission to manage settings (Manage Server permission required).",
+          flags: [MessageFlags.Ephemeral],
+        });
+      }
+    } catch (err) {
+      console.error("[settings_interaction] Failed to send permission error response:", err);
     }
     return;
   }
