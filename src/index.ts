@@ -56,11 +56,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    if (
-      "customId" in interaction &&
-      typeof interaction.customId === "string" &&
-      interaction.customId.startsWith("settings")
-    ) {
+    const isSettingsComponent =
+      (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&
+      (interaction.customId.startsWith("settings:") ||
+        interaction.customId.startsWith("settings_modal:"));
+
+    if (isSettingsComponent) {
       await handleSettingsInteraction(interaction, client);
       return;
     }
@@ -71,6 +72,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   } catch (err) {
     console.error("[index] InteractionCreate handler error:", err);
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction
+        .reply({
+          content: "Something went wrong. Please try again.",
+          flags: [MessageFlags.Ephemeral],
+        })
+        .catch((replyErr) => console.error("[index] Failed to send error reply:", replyErr));
+    }
   }
 });
 
