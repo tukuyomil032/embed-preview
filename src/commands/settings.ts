@@ -246,7 +246,11 @@ function isConfirmed(fields: any, confirmCustomId: string): boolean {
             ? rawFields
             : [];
       for (const item of list as any[]) {
-        if (item && typeof item.customId === "string" && item.customId.includes("confirm")) {
+        if (
+          item &&
+          typeof item.customId === "string" &&
+          (item.customId === confirmCustomId || item.customId.startsWith(`${confirmCustomId}:`))
+        ) {
           if (
             (Array.isArray(item.values) && item.values.length > 0) ||
             (typeof item.value === "string" && item.value.length > 0)
@@ -1151,6 +1155,8 @@ export async function buildDeleteConfirmComponents(
 
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
 
+  const safeIndicesStr = numbers.slice(0, 20).join(",").slice(0, 40);
+
   const buttonsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`settings:back_to_delete_list:${listType}`)
@@ -1158,11 +1164,12 @@ export async function buildDeleteConfirmComponents(
       .setEmoji("⬅️")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId(`settings:confirm_delete_yes:${listType}:${indicesStr}`)
+      .setCustomId(`settings:confirm_delete_yes:${listType}:${safeIndicesStr}`)
       .setLabel("Yes")
-      .setStyle(ButtonStyle.Danger),
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(lines.length === 0),
     new ButtonBuilder()
-      .setCustomId(`settings:confirm_delete_cancel:${listType}:${indicesStr}`)
+      .setCustomId(`settings:confirm_delete_cancel:${listType}:${safeIndicesStr}`)
       .setLabel("Cancel")
       .setStyle(ButtonStyle.Secondary),
   );
