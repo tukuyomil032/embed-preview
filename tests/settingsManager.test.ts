@@ -178,6 +178,44 @@ describe("SettingsManager", () => {
         const allowed = manager.isAllowed("g1", "safe_chan", "safe_user", ["safe_role"]);
         expect(allowed).toBe(false);
       });
+
+      it("ホワイトリストに一致してもブラックリストにも登録されている場合は拒否する(deny-wins)", async () => {
+        const settings = manager.getSettings("g1");
+        settings.blacklist.users.push("ok_user");
+        await manager.setSettings("g1", settings);
+
+        const allowed = manager.isAllowed("g1", "other_chan", "ok_user", ["other_role"]);
+        expect(allowed).toBe(false);
+      });
     });
+  });
+});
+
+describe("SettingsManager デフォルトパスの解決", () => {
+  const originalEnvPath = process.env.SETTINGS_PATH;
+  const originalCwd = process.cwd();
+
+  afterEach(() => {
+    if (originalEnvPath === undefined) {
+      delete process.env.SETTINGS_PATH;
+    } else {
+      process.env.SETTINGS_PATH = originalEnvPath;
+    }
+    process.chdir(originalCwd);
+  });
+
+  it("SETTINGS_PATH が設定されている場合はそれを使う", () => {
+    process.env.SETTINGS_PATH = "/tmp/embed-preview-custom-settings.json";
+    const manager = new SettingsManager();
+    expect((manager as any).filepath).toBe("/tmp/embed-preview-custom-settings.json");
+  });
+
+  it("SETTINGS_PATH 未設定時はプロジェクトルート基準で解決し、process.cwd() に依存しない", () => {
+    delete process.env.SETTINGS_PATH;
+    process.chdir("/tmp");
+
+    const manager = new SettingsManager();
+
+    expect((manager as any).filepath).toBe(path.resolve(originalCwd, "data/settings.json"));
   });
 });

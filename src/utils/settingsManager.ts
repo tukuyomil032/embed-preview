@@ -1,5 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const DEFAULT_SETTINGS_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../data/settings.json",
+);
 
 export interface ListConfig {
   channels: string[];
@@ -57,7 +63,7 @@ export class SettingsManager {
   private writeQueue: Promise<void> = Promise.resolve();
   private isLoaded: boolean = false;
 
-  constructor(filepath: string = "data/settings.json") {
+  constructor(filepath: string = process.env.SETTINGS_PATH ?? DEFAULT_SETTINGS_PATH) {
     this.filepath = filepath;
     this.cache = { guilds: {} };
   }
@@ -164,6 +170,8 @@ export class SettingsManager {
 
   /**
    * Determines if message previewing is allowed under the current guild context.
+   * The blacklist is a deny-override that applies in both modes: a blacklisted
+   * channel/user/role is always rejected, even while in whitelist mode.
    */
   isAllowed(guildId: string, channelId: string, userId: string, roleIds: string[]): boolean {
     if (!this.isLoaded) {
@@ -172,6 +180,18 @@ export class SettingsManager {
 
     const settings = this.getSettings(guildId);
     const { mode, blacklist, whitelist } = settings;
+
+    const blacklistChannels = blacklist.channels || [];
+    const blacklistUsers = blacklist.users || [];
+    const blacklistRoles = blacklist.roles || [];
+
+    const channelBlocked = blacklistChannels.includes(channelId);
+    const userBlocked = blacklistUsers.includes(userId);
+    const roleBlocked = roleIds.some((roleId) => blacklistRoles.includes(roleId));
+
+    if (channelBlocked || userBlocked || roleBlocked) {
+      return false;
+    }
 
     if (mode === "whitelist") {
       const whitelistChannels = whitelist.channels || [];
@@ -183,17 +203,9 @@ export class SettingsManager {
       const roleAllowed = roleIds.some((roleId) => whitelistRoles.includes(roleId));
 
       return channelAllowed || userAllowed || roleAllowed;
-    } else {
-      const blacklistChannels = blacklist.channels || [];
-      const blacklistUsers = blacklist.users || [];
-      const blacklistRoles = blacklist.roles || [];
-
-      const channelBlocked = blacklistChannels.includes(channelId);
-      const userBlocked = blacklistUsers.includes(userId);
-      const roleBlocked = roleIds.some((roleId) => blacklistRoles.includes(roleId));
-
-      return !(channelBlocked || userBlocked || roleBlocked);
     }
+
+    return true;
   }
 }
 

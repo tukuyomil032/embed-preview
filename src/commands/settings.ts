@@ -429,7 +429,11 @@ export async function handleSettingsInteraction(interaction: any, _client: Clien
       typeof customId === "string" &&
       (customId === "settings:toggle_mode" || customId === "settings:open_mode_modal")
     ) {
-      const modal = buildModeModal(settings.mode);
+      const whitelistEntryCount =
+        settings.whitelist.channels.length +
+        settings.whitelist.users.length +
+        settings.whitelist.roles.length;
+      const modal = buildModeModal(settings.mode, whitelistEntryCount);
       await interaction.showModal(modal);
       return;
     }
@@ -1172,14 +1176,15 @@ export async function buildDeleteConfirmComponents(
  * Builds the mode configuration modal (customId: "settings_modal:black_white").
  * Frontend UI developers can construct and return the ModalBuilder here.
  */
-export function buildModeModal(currentMode?: string): any {
+export function buildModeModal(currentMode?: string, whitelistEntryCount = 0): any {
+  const switchingToWhitelist = currentMode === "blacklist";
   const modal = new ModalBuilder()
     .setTitle("Confirm")
     .setCustomId("settings_modal:black_white")
     .addLabelComponents(
       new LabelBuilder()
         .setLabel(
-          currentMode === "blacklist"
+          switchingToWhitelist
             ? "Really switch to whitelist mode?"
             : "Really switch to blacklist mode?",
         )
@@ -1192,7 +1197,7 @@ export function buildModeModal(currentMode?: string): any {
             .setOptions(
               new CheckboxGroupOptionBuilder()
                 .setLabel(
-                  currentMode === "blacklist"
+                  switchingToWhitelist
                     ? "Yes, I will switch to whitelist mode."
                     : "Yes, I will switch to blacklist mode.",
                 )
@@ -1202,11 +1207,19 @@ export function buildModeModal(currentMode?: string): any {
     )
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        currentMode === "blacklist"
-          ? "**When you switch to the whitelist, the bot will operate only for the users, roles, and channels registered on the whitelist.**"
+        switchingToWhitelist
+          ? "**When you switch to the whitelist, the bot will operate only for the users, roles, and channels registered on the whitelist. The blacklist still applies on top of it as a deny-list.**"
           : "**When you switch to the blacklist mode, the bot will operate only for users, roles, and channels that are not on the blacklist.**",
       ),
     );
+
+  if (switchingToWhitelist && whitelistEntryCount === 0) {
+    modal.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# ⚠️ Whitelist currently has 0 entries — the bot will not respond to anyone in this server until you add at least one.`,
+      ),
+    );
+  }
 
   return modal;
 }

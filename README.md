@@ -50,7 +50,11 @@ Edit `.env`:
 
 ```
 DISCORD_TOKEN=your_bot_token_here
+# Optional: override where per-guild settings are persisted (defaults to <project root>/data/settings.json)
+# SETTINGS_PATH=/absolute/path/to/settings.json
 ```
+
+Guild settings (blacklist/whitelist) are stored in `data/settings.json`, which is gitignored. When containerizing (Docker, systemd, etc.), make sure this path — or the directory pointed to by `SETTINGS_PATH` — is on a persistent volume, or settings will reset on every redeploy.
 
 ### Discord Developer Portal settings
 

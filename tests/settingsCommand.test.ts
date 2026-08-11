@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { type ChatInputCommandInteraction, type Client } from "discord.js";
 import {
+  buildModeModal,
   buildSettingsComponents,
   handleSettingCommand,
   handleSettingsInteraction,
@@ -365,5 +366,35 @@ describe("buildSettingsComponents", () => {
     expect(summaryText).toContain("<@u1>");
     expect(summaryText).toContain("<@u2>");
     expect(summaryText).not.toContain("more");
+  });
+});
+
+describe("buildModeModal", () => {
+  function textContents(modal: ReturnType<typeof buildModeModal>): string[] {
+    return modal
+      .toJSON()
+      .components.filter((c: any) => typeof c.content === "string")
+      .map((c: any) => c.content as string);
+  }
+
+  it("ホワイトリストが0件の状態でホワイトリストへ切り替える場合はロックアウト警告を表示する", () => {
+    const modal = buildModeModal("blacklist", 0);
+    expect(textContents(modal).some((c) => c.includes("Whitelist currently has 0 entries"))).toBe(
+      true,
+    );
+  });
+
+  it("ホワイトリストに1件以上ある場合は警告を表示しない", () => {
+    const modal = buildModeModal("blacklist", 3);
+    expect(textContents(modal).some((c) => c.includes("Whitelist currently has 0 entries"))).toBe(
+      false,
+    );
+  });
+
+  it("ブラックリストへ切り替える場合は警告を表示しない", () => {
+    const modal = buildModeModal("whitelist", 0);
+    expect(textContents(modal).some((c) => c.includes("Whitelist currently has 0 entries"))).toBe(
+      false,
+    );
   });
 });
