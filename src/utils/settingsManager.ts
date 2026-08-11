@@ -71,43 +71,65 @@ export class SettingsManager {
 
   /**
    * Loads settings from the file.
-   * If the file does not exist, initializes cache and writes an empty JSON file.
+   * Queued after any pending write operations to avoid race conditions with save().
    */
   async load(): Promise<void> {
+    this.writeQueue = this.writeQueue
+      .catch(() => {})
+      .then(async () => {
+        try {
+          try {
+            await fs.promises.access(this.filepath);
+          } catch {
+            // File doesn't exist, initialize and write empty settings
+            this.cache = { guilds: {} };
+            await this.saveInternal();
+            this.isLoaded = true;
+            return;
+          }
+
+          const content = await fs.promises.readFile(this.filepath, "utf-8");
+          if (!content.trim()) {
+            this.cache = { guilds: {} };
+            await this.saveInternal();
+            this.isLoaded = true;
+            return;
+          }
+
+          const parsed = JSON.parse(content);
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            parsed.guilds &&
+            typeof parsed.guilds === "object"
+          ) {
+            this.cache = parsed;
+          } else {
+            this.cache = { guilds: {} };
+          }
+          this.isLoaded = true;
+        } catch (err) {
+          console.error(`[SettingsManager] Error loading settings from ${this.filepath}:`, err);
+          this.isLoaded = false;
+        }
+      });
+    return this.writeQueue;
+  }
+
+  /**
+   * Internal helper that writes the cache to a temporary file and atomically renames it.
+   */
+  private async saveInternal(): Promise<void> {
     try {
-      try {
-        await fs.promises.access(this.filepath);
-      } catch {
-        // File doesn't exist, initialize and write empty settings
-        this.cache = { guilds: {} };
-        await this.save();
-        this.isLoaded = true;
-        return;
-      }
-
-      const content = await fs.promises.readFile(this.filepath, "utf-8");
-      if (!content.trim()) {
-        this.cache = { guilds: {} };
-        await this.save();
-        this.isLoaded = true;
-        return;
-      }
-
-      const parsed = JSON.parse(content);
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        parsed.guilds &&
-        typeof parsed.guilds === "object"
-      ) {
-        this.cache = parsed;
-      } else {
-        this.cache = { guilds: {} };
-      }
-      this.isLoaded = true;
+      const dir = path.dirname(this.filepath);
+      await fs.promises.mkdir(dir, { recursive: true });
+      const data = JSON.stringify(this.cache, null, 2);
+      const tempPath = `${this.filepath}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+      await fs.promises.writeFile(tempPath, data, "utf-8");
+      await fs.promises.rename(tempPath, this.filepath);
     } catch (err) {
-      console.error(`[SettingsManager] Error loading settings from ${this.filepath}:`, err);
-      this.isLoaded = false;
+      console.error(`[SettingsManager] Failed to save settings to ${this.filepath}:`, err);
+      throw err;
     }
   }
 
@@ -118,15 +140,7 @@ export class SettingsManager {
     this.writeQueue = this.writeQueue
       .catch(() => {})
       .then(async () => {
-        try {
-          const dir = path.dirname(this.filepath);
-          await fs.promises.mkdir(dir, { recursive: true });
-          const data = JSON.stringify(this.cache, null, 2);
-          await fs.promises.writeFile(this.filepath, data, "utf-8");
-        } catch (err) {
-          console.error(`[SettingsManager] Failed to save settings to ${this.filepath}:`, err);
-          throw err;
-        }
+        await this.saveInternal();
       });
     return this.writeQueue;
   }

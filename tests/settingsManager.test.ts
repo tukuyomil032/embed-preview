@@ -91,6 +91,21 @@ describe("SettingsManager", () => {
       expect(manager.getIsLoaded()).toBe(false);
       expect(manager.isAllowed("g1", "c1", "u1", [])).toBe(false);
     });
+
+    it("並行して setSettings と load を実行してもデータの一貫性が維持される", async () => {
+      await manager.load();
+      const settings1 = createDefaultGuildSettings();
+      settings1.mode = "whitelist";
+
+      // Trigger setSettings (which queues a save) and load concurrently
+      const p1 = manager.setSettings("g_race", settings1);
+      const p2 = manager.load();
+
+      await Promise.all([p1, p2]);
+
+      const result = manager.getSettings("g_race");
+      expect(result.mode).toBe("whitelist");
+    });
   });
 
   describe("isAllowed 判定ロジック", () => {
