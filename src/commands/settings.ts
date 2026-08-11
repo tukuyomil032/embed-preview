@@ -21,8 +21,6 @@ import {
   UserSelectMenuBuilder,
   RoleSelectMenuBuilder,
   ChannelSelectMenuBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
   PermissionFlagsBits,
 } from "discord.js";
 import { settingsManager, type GuildSettings, type ListConfig } from "../utils/settingsManager.ts";
@@ -914,107 +912,6 @@ async function resolveListNames(
   return { users, roles, channels };
 }
 
-export async function buildDeleteModal(
-  listType: "whitelist" | "blacklist",
-  settings: GuildSettings,
-  guild?: any,
-): Promise<ModalBuilder> {
-  const modal = new ModalBuilder()
-    .setTitle(`Delete from ${listType === "blacklist" ? "Blacklist" : "Whitelist"}`)
-    .setCustomId(`settings_modal:delete:${listType}`)
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `Please select *the users, roles, or channels* to delete from **${listType}**.`,
-      ),
-    );
-
-  const targetList = settings[listType];
-  const names = await resolveListNames(guild, targetList);
-
-  const userOptions: StringSelectMenuOptionBuilder[] = [];
-  for (const id of targetList.users) {
-    const label = `@${names.users.get(id) ?? id} (${id})`.slice(0, 100);
-    userOptions.push(
-      new StringSelectMenuOptionBuilder().setLabel(label).setValue(`${listType}:users:${id}`),
-    );
-  }
-
-  const roleOptions: StringSelectMenuOptionBuilder[] = [];
-  for (const id of targetList.roles) {
-    const label = `@${names.roles.get(id) ?? id} (${id})`.slice(0, 100);
-    roleOptions.push(
-      new StringSelectMenuOptionBuilder().setLabel(label).setValue(`${listType}:roles:${id}`),
-    );
-  }
-
-  const channelOptions: StringSelectMenuOptionBuilder[] = [];
-  for (const id of targetList.channels) {
-    const label = `#${names.channels.get(id) ?? id} (${id})`.slice(0, 100);
-    channelOptions.push(
-      new StringSelectMenuOptionBuilder().setLabel(label).setValue(`${listType}:channels:${id}`),
-    );
-  }
-
-  if (userOptions.length > 0) {
-    const userSelect = new StringSelectMenuBuilder()
-      .setCustomId("delete_users")
-      .setPlaceholder("@foo, @bar, ...")
-      .setMaxValues(Math.min(userOptions.length, 25))
-      .setMinValues(1)
-      .setRequired(false)
-      .setOptions(userOptions);
-
-    modal.addLabelComponents(
-      new LabelBuilder().setLabel("Users").setStringSelectMenuComponent(userSelect),
-    );
-  }
-
-  if (roleOptions.length > 0) {
-    const roleSelect = new StringSelectMenuBuilder()
-      .setCustomId("delete_roles")
-      .setPlaceholder("@everyone, @moderators, ...")
-      .setMaxValues(Math.min(roleOptions.length, 25))
-      .setMinValues(1)
-      .setRequired(false)
-      .setOptions(roleOptions);
-
-    modal.addLabelComponents(
-      new LabelBuilder().setLabel("Roles").setStringSelectMenuComponent(roleSelect),
-    );
-  }
-
-  if (channelOptions.length > 0) {
-    const channelSelect = new StringSelectMenuBuilder()
-      .setCustomId("delete_channels")
-      .setPlaceholder("#general, #rule, ...")
-      .setMaxValues(Math.min(channelOptions.length, 25))
-      .setMinValues(1)
-      .setRequired(false)
-      .setOptions(channelOptions);
-
-    modal.addLabelComponents(
-      new LabelBuilder().setLabel("Channels").setStringSelectMenuComponent(channelSelect),
-    );
-  }
-
-  modal.addLabelComponents(
-    new LabelBuilder()
-      .setLabel("Are you sure you want to delete these?")
-      .setCheckboxGroupComponent(
-        new CheckboxGroupBuilder()
-          .setCustomId("delete_confirm")
-          .setRequired(true)
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setOptions(
-            new CheckboxGroupOptionBuilder().setLabel("Yes, I'll delete those.").setValue("Yes"),
-          ),
-      ),
-  );
-
-  return modal;
-}
-
 /**
  * Builds the fallback UI when total registered items exceed 25.
  * Displays numbered list in codeblocks and a button to prompt for deletion by index.
@@ -1166,6 +1063,12 @@ export async function buildDeleteConfirmComponents(
       .setCustomId(`settings:confirm_delete_cancel:${listType}:${sessionKey}`)
       .setLabel("Cancel")
       .setStyle(ButtonStyle.Secondary),
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      "-# :warning: You cannot proceed because no items have been selected. Please click `Cancel` and select the items you wish to delete.",
+    ),
   );
 
   container.addActionRowComponents(buttonsRow);
