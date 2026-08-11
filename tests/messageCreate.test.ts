@@ -1,10 +1,14 @@
-import type { Client, Message } from "discord.js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../src/utils/previewCore.ts", () => ({ previewMessageLink: vi.fn() }));
-
+import { type Client, type Message, Events } from "discord.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { registerMessageCreateEvent } from "../src/events/messageCreate.ts";
 import { previewMessageLink } from "../src/utils/previewCore.ts";
+import { settingsManager } from "../src/utils/settingsManager.ts";
+
+vi.mock("../src/utils/previewCore.ts", () => ({
+  previewMessageLink: vi.fn(),
+}));
 
 function setup() {
   let handler!: (message: Message) => Promise<void>;
@@ -26,11 +30,11 @@ function makeMessage(overrides: Record<string, unknown> = {}) {
   } as unknown as Message;
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
 describe("registerMessageCreateEvent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("bot自身のメッセージは無視する", async () => {
     const { getHandler } = setup();
     await getHandler()(makeMessage({ author: { bot: true } }));
@@ -90,5 +94,238 @@ describe("registerMessageCreateEvent", () => {
     expect(previewMessageLink).toHaveBeenCalledTimes(2);
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+});
+
+const TEST_FILE = path.resolve("tests/temp-message-settings.json");
+
+describe("MessageCreate Event Integration with Settings", () => {
+  let client: Client;
+  let eventCallback: ((message: Message) => Promise<void>) | undefined;
+  const originalFilepath = (settingsManager as any).filepath;
+  const originalCache = (settingsManager as any).cache;
+  const originalIsLoaded = (settingsManager as any).isLoaded;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    (settingsManager as any).filepath = TEST_FILE;
+    (settingsManager as any).cache = { guilds: {} };
+    if (fs.existsSync(TEST_FILE)) {
+      await fs.promises.unlink(TEST_FILE);
+    }
+
+    client = {
+      user: { id: "bot_123" },
+      on: vi.fn().mockImplementation((event, cb) => {
+        if (event === Events.MessageCreate) {
+          eventCallback = cb;
+        }
+      }),
+    } as unknown as Client;
+
+    await settingsManager.load();
+    registerMessageCreateEvent(client);
+  });
+
+  afterEach(async () => {
+    (settingsManager as any).filepath = originalFilepath;
+    (settingsManager as any).cache = originalCache;
+    (settingsManager as any).isLoaded = originalIsLoaded;
+    if (fs.existsSync(TEST_FILE)) {
+      try {
+        await fs.promises.unlink(TEST_FILE);
+      } catch (err) {
+        console.warn(`[test] Failed to clean up ${TEST_FILE}:`, err);
+      }
+    }
+  });
+
+  function createMockMessage(options: {
+    guildId?: string | null;
+    channelId?: string;
+    userId?: string;
+    roles?: string[];
+    content?: string;
+    bot?: boolean;
+  }) {
+    const cache = new Map();
+    if (options.roles) {
+      for (const roleId of options.roles) {
+        cache.set(roleId, { id: roleId });
+      }
+    }
+
+    return {
+      author: {
+        bot: options.bot ?? false,
+        id: options.userId ?? "user_abc",
+      },
+      content: options.content ?? "<@bot_123> https://discord.com/channels/123/456/789",
+      guildId: options.guildId !== undefined ? options.guildId : "123",
+      channelId: options.channelId ?? "456",
+      member: {
+        roles: { cache },
+      },
+    } as unknown as Message;
+  }
+
+  it("should trigger preview by default if there are no restrictions", async () => {
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
+
+  it("should block preview if channel is blacklisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.channels.push("456");
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).not.toHaveBeenCalled();
+  });
+
+  it("should block preview if user is blacklisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.users.push("user_abc");
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).not.toHaveBeenCalled();
+  });
+
+  it("should block preview if role is blacklisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.roles.push("role_bad");
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: ["role_bad"],
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).not.toHaveBeenCalled();
+  });
+
+  it("should bypass checks if outside a guild (DM)", async () => {
+    const message = createMockMessage({
+      guildId: null,
+      channelId: "dm_chan",
+      userId: "user_abc",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
+
+  it("should allow preview in whitelist mode when user is whitelisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.users.push("user_white");
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_white",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
+
+  it("should allow preview if @everyone (guildId) is whitelisted even though it's absent from the role cache", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.roles.push("123"); // @everyone role ID
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: ["other_role"], // does not contain '123' explicitly
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
+  });
+
+  it("should block preview in whitelist mode when user is not whitelisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.users = [];
+    await settingsManager.setSettings("123", settings);
+
+    const message = createMockMessage({
+      guildId: "123",
+      channelId: "456",
+      userId: "unlisted_user",
+    });
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).not.toHaveBeenCalled();
+  });
+
+  it("should handle member: null gracefully when processing in a guild", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "blacklist";
+    await settingsManager.setSettings("123", settings);
+
+    const message = {
+      ...createMockMessage({
+        guildId: "123",
+        channelId: "456",
+        userId: "user_no_member",
+      }),
+      member: null,
+    } as unknown as Message;
+
+    expect(eventCallback).toBeDefined();
+    await eventCallback!(message);
+
+    expect(previewMessageLink).toHaveBeenCalled();
   });
 });

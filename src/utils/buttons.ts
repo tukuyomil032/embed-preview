@@ -1,10 +1,5 @@
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  type ButtonInteraction,
-  type Interaction,
-} from "discord.js";
+import type { Interaction } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, type ButtonInteraction } from "discord.js";
 
 export function makeMessageButtons(originalUrl: string): ActionRowBuilder<ButtonBuilder> {
   const openBtn = new ButtonBuilder()
@@ -13,9 +8,9 @@ export function makeMessageButtons(originalUrl: string): ActionRowBuilder<Button
     .setStyle(ButtonStyle.Primary);
 
   const linkBtn = new ButtonBuilder()
-    .setURL(originalUrl)
     .setLabel("Direct link")
-    .setStyle(ButtonStyle.Link);
+    .setStyle(ButtonStyle.Link)
+    .setURL(originalUrl);
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(openBtn, linkBtn);
 }

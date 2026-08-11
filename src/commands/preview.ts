@@ -4,10 +4,16 @@ import {
   REST,
   Routes,
   SlashCommandBuilder,
+  MessageFlags,
+  ContainerBuilder,
+  TextDisplayBuilder,
 } from "discord.js";
 import { extractMessageLinks } from "../utils/urlParser.ts";
 import { fetchTargetMessage } from "../utils/fetcher.ts";
 import { buildPreviewPayload } from "../utils/previewCore.ts";
+import { settingCommand } from "./settings.ts";
+import { settingsManager } from "../utils/settingsManager.ts";
+import { extractMemberRoleIds } from "../utils/memberUtils.ts";
 
 export const previewCommand = new SlashCommandBuilder()
   .setName("preview")
@@ -20,6 +26,47 @@ export async function handlePreviewCommand(
   interaction: ChatInputCommandInteraction,
   client: Client,
 ): Promise<void> {
+  if (interaction.guildId) {
+    if (!settingsManager.getIsLoaded()) {
+      try {
+        const container = new ContainerBuilder()
+          .setAccentColor(0xed4245)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              "Preview feature is restricted. Unable to load settings file.",
+            ),
+          );
+        await interaction.reply({
+          components: [container],
+          flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
+        });
+      } catch (err) {
+        console.error("[preview] Failed to send settings load error response:", err);
+      }
+      return;
+    }
+
+    const roleIds = extractMemberRoleIds(interaction.member, interaction.guildId);
+    if (
+      !settingsManager.isAllowed(
+        interaction.guildId,
+        interaction.channelId,
+        interaction.user.id,
+        roleIds,
+      )
+    ) {
+      try {
+        await interaction.reply({
+          content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+          flags: [MessageFlags.Ephemeral],
+        });
+      } catch (err) {
+        console.error("[preview] Failed to send permission error response:", err);
+      }
+      return;
+    }
+  }
+
   try {
     await interaction.deferReply();
   } catch (err) {
@@ -32,7 +79,10 @@ export async function handlePreviewCommand(
 
   if (links.length === 0) {
     try {
-      await interaction.followUp({ content: "Invalid message link.", ephemeral: true });
+      await interaction.followUp({
+        content: "Invalid message link.",
+        flags: [MessageFlags.Ephemeral],
+      });
     } catch (err) {
       console.error("[preview] Failed to send invalid-link response:", err);
     }
@@ -44,7 +94,10 @@ export async function handlePreviewCommand(
 
   if (!result) {
     try {
-      await interaction.followUp({ content: "Message not found.", ephemeral: true });
+      await interaction.followUp({
+        content: "Message not found.",
+        flags: [MessageFlags.Ephemeral],
+      });
     } catch (err) {
       console.error("[preview] Failed to send not-found response:", err);
     }
@@ -71,6 +124,6 @@ export async function registerSlashCommands(client: Client, token: string): Prom
   if (!clientId) return;
 
   await rest.put(Routes.applicationCommands(clientId), {
-    body: [previewCommand.toJSON()],
+    body: [previewCommand.toJSON(), settingCommand.toJSON()],
   });
 }

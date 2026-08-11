@@ -1,6 +1,17 @@
 import type { ChatInputCommandInteraction, Client } from "discord.js";
-import { Routes } from "discord.js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MessageFlags, REST, Routes } from "discord.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import {
+  handlePreviewCommand,
+  previewCommand,
+  registerSlashCommands,
+} from "../src/commands/preview.ts";
+import { settingCommand } from "../src/commands/settings.ts";
+import { fetchTargetMessage } from "../src/utils/fetcher.ts";
+import { buildPreviewPayload } from "../src/utils/previewCore.ts";
+import { settingsManager } from "../src/utils/settingsManager.ts";
 
 vi.mock("../src/utils/fetcher.ts", () => ({ fetchTargetMessage: vi.fn() }));
 vi.mock("../src/utils/previewCore.ts", () => ({ buildPreviewPayload: vi.fn() }));
@@ -9,77 +20,86 @@ vi.mock("discord.js", async (importOriginal) => {
   return { ...actual, REST: vi.fn() };
 });
 
-import { REST } from "discord.js";
-import {
-  handlePreviewCommand,
-  previewCommand,
-  registerSlashCommands,
-} from "../src/commands/preview.ts";
-import { fetchTargetMessage } from "../src/utils/fetcher.ts";
-import { buildPreviewPayload } from "../src/utils/previewCore.ts";
+function createMockInteraction(link: string | null = "https://discord.com/channels/1/2/3") {
+  const deferReply = vi.fn().mockResolvedValue(undefined);
+  const followUp = vi.fn().mockResolvedValue(undefined);
+  const getString = vi.fn().mockReturnValue(link);
 
-function makeInteraction(overrides: Record<string, unknown> = {}) {
   return {
-    deferReply: vi.fn().mockResolvedValue(undefined),
-    followUp: vi.fn().mockResolvedValue(undefined),
-    options: { getString: vi.fn().mockReturnValue("https://discord.com/channels/1/2/3") },
-    ...overrides,
-  };
+    deferReply,
+    followUp,
+    options: { getString },
+  } as unknown as ChatInputCommandInteraction;
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
 describe("handlePreviewCommand", () => {
-  it("deferReplyが失敗した場合はfollowUpを呼ばない", async () => {
-    const interaction = makeInteraction({
-      deferReply: vi.fn().mockRejectedValue(new Error("defer failed")),
-    });
-
-    await handlePreviewCommand(interaction as unknown as ChatInputCommandInteraction, {} as Client);
-
-    expect(interaction.followUp).not.toHaveBeenCalled();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("リンクを含まない場合はInvalid message linkを返す", async () => {
-    const interaction = makeInteraction({
-      options: { getString: vi.fn().mockReturnValue("not a discord link") },
-    });
+  it("linkが空の場合はInvalid message linkを返す", async () => {
+    const interaction = createMockInteraction(null);
 
-    await handlePreviewCommand(interaction as unknown as ChatInputCommandInteraction, {} as Client);
+    await handlePreviewCommand(interaction, {} as Client);
 
     expect(interaction.followUp).toHaveBeenCalledWith({
       content: "Invalid message link.",
-      ephemeral: true,
+      flags: [MessageFlags.Ephemeral],
     });
   });
 
-  it("メッセージが見つからない場合はMessage not foundを返す", async () => {
-    vi.mocked(fetchTargetMessage).mockResolvedValueOnce(null);
-    const interaction = makeInteraction();
+  it("Discordのメッセージリンクでない文字列の場合はInvalid message linkを返す", async () => {
+    const interaction = createMockInteraction("https://example.com/not-a-discord-link");
 
-    await handlePreviewCommand(interaction as unknown as ChatInputCommandInteraction, {} as Client);
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.followUp).toHaveBeenCalledWith({
+      content: "Invalid message link.",
+      flags: [MessageFlags.Ephemeral],
+    });
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+  });
+
+  it("deferReplyが失敗した場合はログを出力して処理を中断する", async () => {
+    const interaction = createMockInteraction();
+    interaction.deferReply = vi.fn().mockRejectedValue(new Error("defer error"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(consoleSpy).toHaveBeenCalledWith("[preview] Failed to defer reply:", expect.any(Error));
+    expect(interaction.followUp).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("メッセージ取得失敗時はMessage not foundを返す", async () => {
+    const interaction = createMockInteraction();
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+
+    await handlePreviewCommand(interaction, {} as Client);
 
     expect(interaction.followUp).toHaveBeenCalledWith({
       content: "Message not found.",
-      ephemeral: true,
+      flags: [MessageFlags.Ephemeral],
     });
   });
 
-  it("正常系ではbuildPreviewPayloadの結果でfollowUpする", async () => {
-    vi.mocked(fetchTargetMessage).mockResolvedValueOnce({
-      message: {} as never,
+  it("メッセージ取得成功時はbuildPreviewPayloadの返り値をfollowUpに渡す", async () => {
+    const interaction = createMockInteraction();
+    const targetMsg = {} as never;
+    const payload = { embeds: [], files: [], components: [] } as never;
+
+    vi.mocked(fetchTargetMessage).mockResolvedValue({
+      message: targetMsg,
       channel: {} as never,
       guild: {} as never,
     });
-    const fixedPayload = { embeds: [], files: [], components: [] };
-    vi.mocked(buildPreviewPayload).mockResolvedValueOnce(fixedPayload as never);
-    const interaction = makeInteraction();
+    vi.mocked(buildPreviewPayload).mockResolvedValue(payload);
 
-    await handlePreviewCommand(interaction as unknown as ChatInputCommandInteraction, {} as Client);
+    await handlePreviewCommand(interaction, {} as Client);
 
-    expect(interaction.followUp).toHaveBeenCalledWith(fixedPayload);
+    expect(buildPreviewPayload).toHaveBeenCalledWith(targetMsg, expect.anything(), "1", "2", "3");
+    expect(interaction.followUp).toHaveBeenCalledWith(payload);
   });
 });
 
@@ -110,7 +130,241 @@ describe("registerSlashCommands", () => {
 
     expect(restInstance.setToken).toHaveBeenCalledWith("token");
     expect(restInstance.put).toHaveBeenCalledWith(Routes.applicationCommands("app-1"), {
-      body: [previewCommand.toJSON()],
+      body: [previewCommand.toJSON(), settingCommand.toJSON()],
     });
+  });
+});
+
+const TEST_FILE = path.resolve("tests/temp-preview-settings.json");
+
+describe("Preview Command Integration with Settings", () => {
+  const originalFilepath = (settingsManager as any).filepath;
+  const originalCache = (settingsManager as any).cache;
+  const originalIsLoaded = (settingsManager as any).isLoaded;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    (settingsManager as any).filepath = TEST_FILE;
+    (settingsManager as any).cache = { guilds: {} };
+    if (fs.existsSync(TEST_FILE)) {
+      await fs.promises.unlink(TEST_FILE);
+    }
+    await settingsManager.load();
+  });
+
+  afterEach(async () => {
+    (settingsManager as any).filepath = originalFilepath;
+    (settingsManager as any).cache = originalCache;
+    (settingsManager as any).isLoaded = originalIsLoaded;
+    if (fs.existsSync(TEST_FILE)) {
+      try {
+        await fs.promises.unlink(TEST_FILE);
+      } catch (err) {
+        console.warn(`[test] Failed to clean up ${TEST_FILE}:`, err);
+      }
+    }
+  });
+
+  function createMockInteraction(options: {
+    guildId?: string | null;
+    channelId?: string;
+    userId?: string;
+    roles?: string[] | { cache: Map<string, any> };
+    link?: string;
+  }) {
+    const deferReply = vi.fn().mockResolvedValue(undefined);
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const followUp = vi.fn().mockResolvedValue(undefined);
+    const getString = vi.fn().mockImplementation((name: string) => {
+      if (name === "link") return options.link ?? "https://discord.com/channels/123/456/789";
+      return null;
+    });
+
+    return {
+      deferReply,
+      reply,
+      followUp,
+      guildId: options.guildId !== undefined ? options.guildId : "123",
+      channelId: options.channelId ?? "456",
+      user: { id: options.userId ?? "user_abc" },
+      member: {
+        roles: options.roles ?? { cache: new Map() },
+      },
+      options: {
+        getString,
+      },
+    } as unknown as ChatInputCommandInteraction;
+  }
+
+  it("should return container error response when settings failed to load (isLoaded is false)", async () => {
+    (settingsManager as any).isLoaded = false;
+    const interaction = createMockInteraction({
+      guildId: "123",
+    });
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
+      }),
+    );
+  });
+
+  it("should allow preview by default if there are no settings restrictions", async () => {
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+    });
+
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(fetchTargetMessage).toHaveBeenCalled();
+    expect(interaction.followUp).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "Message not found." }),
+    );
+  });
+
+  it("should restrict preview if channel is blacklisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.channels.push("456");
+    await settingsManager.setSettings("123", settings);
+
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+    });
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        flags: [MessageFlags.Ephemeral],
+      }),
+    );
+  });
+
+  it("should restrict preview if user is blacklisted", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.users.push("user_abc");
+    await settingsManager.setSettings("123", settings);
+
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+    });
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        flags: [MessageFlags.Ephemeral],
+      }),
+    );
+  });
+
+  it("should restrict preview if role is blacklisted (cache roles)", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.roles.push("role_bad");
+    await settingsManager.setSettings("123", settings);
+
+    const cache = new Map();
+    cache.set("role_bad", { id: "role_bad" });
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: { cache },
+    });
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        flags: [MessageFlags.Ephemeral],
+      }),
+    );
+  });
+
+  it("should allow preview if @everyone (guildId) is whitelisted even when member.roles is an array", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.mode = "whitelist";
+    settings.whitelist.roles.push("123"); // @everyone role ID
+    await settingsManager.setSettings("123", settings);
+
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: ["other_role"], // does not contain '123' explicitly
+    });
+
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(fetchTargetMessage).toHaveBeenCalled();
+  });
+
+  it("should restrict preview if role is blacklisted (array roles)", async () => {
+    await settingsManager.load();
+    const settings = settingsManager.getSettings("123");
+    settings.blacklist.roles.push("role_bad");
+    await settingsManager.setSettings("123", settings);
+
+    const interaction = createMockInteraction({
+      guildId: "123",
+      channelId: "456",
+      userId: "user_abc",
+      roles: ["role_bad"],
+    });
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(fetchTargetMessage).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+        flags: [MessageFlags.Ephemeral],
+      }),
+    );
+  });
+
+  it("should bypass restrictions if outside a guild (DM)", async () => {
+    const interaction = createMockInteraction({
+      guildId: null,
+      channelId: "dm_chan",
+      userId: "user_abc",
+    });
+
+    vi.mocked(fetchTargetMessage).mockResolvedValue(null);
+
+    await handlePreviewCommand(interaction, {} as Client);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(fetchTargetMessage).toHaveBeenCalled();
   });
 });
