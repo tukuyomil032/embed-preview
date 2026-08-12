@@ -1,9 +1,13 @@
 import {
   type ChatInputCommandInteraction,
   Client,
+  ContainerBuilder,
   Events,
   GatewayIntentBits,
   MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
 } from "discord.js";
 import { config } from "dotenv";
 import { registerMessageCreateEvent } from "./events/messageCreate.ts";
@@ -16,6 +20,7 @@ import {
 } from "./utils/buttons.ts";
 import { resolveDiscordToken } from "./utils/env.ts";
 import { settingsManager } from "./utils/settingsManager.ts";
+import { canDeletePreviewFunc } from "./utils/canDeletePreviewUtil.ts";
 
 config();
 
@@ -76,10 +81,40 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (isDeletePreviewButton(interaction)) {
+      const canDeletePreviewResult = await canDeletePreviewFunc(interaction, client);
+      if (!canDeletePreviewResult.canDeletePreview) {
+        const container = new ContainerBuilder()
+          .setAccentColor(0xff0000)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              ":warning: Error\nYou don't have enough permission to delete this preview.",
+            ),
+          )
+          .addSeparatorComponents(
+            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`-# [ref] "Manage messages" permission: :x:`),
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`-# [ref] Preview Invoker: :x:`),
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `-# [ref] Owner of the message being previewed: :x:`,
+            ),
+          );
+
+        await interaction.reply({
+          components: [container],
+          flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2],
+        });
+        return;
+      }
       const previewMsg = interaction.message;
       try {
         const originalMsg = await interaction.message.fetchReference();
-        await originalMsg.delete().catch(() => {});
+        await originalMsg.delete().catch(() => { });
         await previewMsg.delete();
       } catch {
         console.warn("[index] Failed to delete the original message");
