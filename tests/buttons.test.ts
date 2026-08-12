@@ -1,16 +1,17 @@
 import { ButtonStyle } from "discord.js";
 import { describe, expect, it } from "vitest";
 import {
+  isDeletePreviewButton,
   isOpenOriginalButton,
   makeMessageButtons,
   resolveOriginalUrlFromButtonInteraction,
 } from "../src/utils/buttons.ts";
 
 describe("makeMessageButtons", () => {
-  it("開くボタンとリンクボタンの2つを含む", () => {
+  it("開くボタン、リンクボタン、削除ボタンの3つを含む", () => {
     const row = makeMessageButtons("https://discord.com/channels/1/2/3");
     const data = row.toJSON();
-    expect(data.components).toHaveLength(2);
+    expect(data.components).toHaveLength(3);
   });
 
   it("1つ目は open_original_message ボタン", () => {
@@ -30,6 +31,15 @@ describe("makeMessageButtons", () => {
       label: "Direct link",
       style: ButtonStyle.Link,
       url: "https://discord.com/channels/1/2/3",
+    });
+  });
+
+  it("3つ目はdelete_preview削除ボタン", () => {
+    const row = makeMessageButtons("https://discord.com/channels/1/2/3");
+    const [, , delBtn] = row.toJSON().components;
+    expect(delBtn).toMatchObject({
+      custom_id: "delete_preview",
+      style: ButtonStyle.Danger,
     });
   });
 });
@@ -82,5 +92,22 @@ describe("resolveOriginalUrlFromButtonInteraction", () => {
     expect(resolveOriginalUrlFromButtonInteraction(interaction as never)).toBe(
       "メッセージリンクが見つかりません",
     );
+  });
+});
+
+describe("isDeletePreviewButton", () => {
+  it("ボタンかつcustomIdがdelete_previewであればtrue", () => {
+    const interaction = { isButton: () => true, customId: "delete_preview" };
+    expect(isDeletePreviewButton(interaction as never)).toBe(true);
+  });
+
+  it("ボタンでなければfalse", () => {
+    const interaction = { isButton: () => false, customId: "delete_preview" };
+    expect(isDeletePreviewButton(interaction as never)).toBe(false);
+  });
+
+  it("ボタンでもcustomIdが違えばfalse", () => {
+    const interaction = { isButton: () => true, customId: "something_else" };
+    expect(isDeletePreviewButton(interaction as never)).toBe(false);
   });
 });

@@ -57,7 +57,7 @@ export async function handlePreviewCommand(
     ) {
       try {
         await interaction.reply({
-          content: "このチャンネル、ユーザー、またはロールではプレビューが制限されています。",
+          content: "Previews are restricted for this channel, user, or role.",
           flags: [MessageFlags.Ephemeral],
         });
       } catch (err) {
