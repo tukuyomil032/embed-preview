@@ -87,7 +87,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setAccentColor(0xff0000)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-              ":warning: Error\nYou don't have enough permission to delete this preview.",
+              "## :warning: Error\nYou don't have enough permission to delete this preview.",
             ),
           )
           .addSeparatorComponents(
