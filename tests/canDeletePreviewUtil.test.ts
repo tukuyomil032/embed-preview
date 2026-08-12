@@ -15,7 +15,7 @@ describe("canDeletePreviewFunc", () => {
     } as any;
 
     const result = await canDeletePreviewFunc(interaction, dummyClient);
-    expect(result).toEqual({ canDeletePreview: true });
+    expect(result).toEqual({ canDeletePreview: true, canDeleteOriginal: true });
   });
 
   it("メンション経由の呼び出し主 (fetchReference 成功) であれば canDeletePreview: true を返す", async () => {
@@ -30,7 +30,7 @@ describe("canDeletePreviewFunc", () => {
     } as any;
 
     const result = await canDeletePreviewFunc(interaction, dummyClient);
-    expect(result).toEqual({ canDeletePreview: true });
+    expect(result).toEqual({ canDeletePreview: true, canDeleteOriginal: true });
   });
 
   it("スラッシュコマンド経由の呼び出し主 (interactionMetadata) であれば canDeletePreview: true を返す", async () => {
@@ -46,7 +46,7 @@ describe("canDeletePreviewFunc", () => {
     } as any;
 
     const result = await canDeletePreviewFunc(interaction, dummyClient);
-    expect(result).toEqual({ canDeletePreview: true });
+    expect(result).toEqual({ canDeletePreview: true, canDeleteOriginal: true });
   });
 
   it("プレビュー対象メッセージの作成者であれば canDeletePreview: true を返す", async () => {
@@ -68,7 +68,7 @@ describe("canDeletePreviewFunc", () => {
     } as any);
 
     const result = await canDeletePreviewFunc(interaction, dummyClient);
-    expect(result).toEqual({ canDeletePreview: true });
+    expect(result).toEqual({ canDeletePreview: true, canDeleteOriginal: false });
   });
 
   it("いずれの権限も持たない第三者の場合は canDeletePreview: false と reason を返す", async () => {
@@ -92,6 +92,7 @@ describe("canDeletePreviewFunc", () => {
     const result = await canDeletePreviewFunc(interaction, dummyClient);
     expect(result).toEqual({
       canDeletePreview: false,
+      canDeleteOriginal: false,
       reason: "not_owner_invoker_or_mod",
     });
   });

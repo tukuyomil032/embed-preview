@@ -8,6 +8,7 @@ import { fetchTargetMessage } from "./fetcher.ts";
  */
 export interface canDeletePreviewResult {
   canDeletePreview: boolean;
+  canDeleteOriginal: boolean;
   reason?: string;
 }
 
@@ -27,6 +28,7 @@ export async function canDeletePreviewFunc(
     // If the user who pressed the button has permission to manage the message
     return {
       canDeletePreview: true,
+      canDeleteOriginal: true,
     };
   }
 
@@ -45,6 +47,7 @@ export async function canDeletePreviewFunc(
   if (clickingUserId === previewInvokerId) {
     return {
       canDeletePreview: true,
+      canDeleteOriginal: true,
     };
   }
 
@@ -62,6 +65,7 @@ export async function canDeletePreviewFunc(
       if (targetResult && targetResult.message.author.id === clickingUserId) {
         return {
           canDeletePreview: true,
+          canDeleteOriginal: false,
         };
       }
     }
@@ -71,6 +75,7 @@ export async function canDeletePreviewFunc(
 
   return {
     canDeletePreview: false,
+    canDeleteOriginal: false,
     reason: "not_owner_invoker_or_mod",
   };
 }

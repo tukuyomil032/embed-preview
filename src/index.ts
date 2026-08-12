@@ -112,15 +112,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       const previewMsg = interaction.message;
-      try {
-        const originalMsg = await interaction.message.fetchReference();
-        await originalMsg.delete().catch((err) => {
-          console.warn("[index] Failed to delete original message:", err);
-        });
-        await previewMsg.delete();
-      } catch (err) {
-        console.warn("[index] Failed to fetch original message:", err);
-        await previewMsg.delete();
+      await previewMsg.delete();
+
+      if (canDeletePreviewResult.canDeleteOriginal) {
+        try {
+          const originalMsg = await interaction.message.fetchReference();
+          await originalMsg.delete().catch((err) => {
+            console.warn("[index] Failed to delete original message:", err);
+          });
+        } catch (err) {
+          console.warn("[index] Failed to fetch original message:", err);
+        }
       }
     }
   } catch (err) {
