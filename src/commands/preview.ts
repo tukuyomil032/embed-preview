@@ -1,10 +1,10 @@
 import {
   type ChatInputCommandInteraction,
   type Client,
-  MessageFlags,
   REST,
   Routes,
   SlashCommandBuilder,
+  MessageFlags,
   ContainerBuilder,
   TextDisplayBuilder,
 } from "discord.js";
@@ -56,7 +56,7 @@ export async function handlePreviewCommand(
       )
     ) {
       try {
-        await interaction.followUp({
+        await interaction.reply({
           content: "Previews are restricted for this channel, user, or role.",
           flags: [MessageFlags.Ephemeral],
         });
