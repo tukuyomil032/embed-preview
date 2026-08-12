@@ -247,7 +247,7 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
@@ -271,7 +271,7 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
@@ -298,7 +298,7 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
@@ -345,7 +345,7 @@ describe("Preview Command Integration with Settings", () => {
 
     expect(interaction.deferReply).not.toHaveBeenCalled();
     expect(fetchTargetMessage).not.toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalledWith(
+    expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "Previews are restricted for this channel, user, or role.",
         flags: [MessageFlags.Ephemeral],
